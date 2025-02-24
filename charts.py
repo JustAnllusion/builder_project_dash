@@ -1,128 +1,64 @@
-import altair as alt
+import plotly.express as px
+import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
 from utils import compute_avg_depletion_curve, load_depletion_curves
 
-
-def build_histogram(
-    chart_data, hist_column, color_domain, color_range, normalize, height=400
-):
-    if normalize:
-        chart = (
-            alt.Chart(chart_data)
-            .transform_bin("bin", field=hist_column, bin=alt.Bin(maxbins=30))
-            .transform_aggregate(count="count()", groupby=["bin", "group"])
-            .transform_window(total="sum(count)", groupby=["group"])
-            .transform_calculate(fraction="datum.count / datum.total")
-            .mark_bar(opacity=0.7)
-            .encode(
-                x=alt.X("bin:Q", title=hist_column),
-                y=alt.Y("fraction:Q", title="Доля", axis=alt.Axis(format=".0%")),
-                color=alt.Color(
-                    "group:N",
-                    scale=alt.Scale(domain=color_domain, range=color_range),
-                    legend=alt.Legend(title="Группа"),
-                ),
-            )
-            .properties(height=height)
-        )
-    else:
-        chart = (
-            alt.Chart(chart_data)
-            .mark_bar(opacity=0.7)
-            .encode(
-                x=alt.X(f"{hist_column}:Q", bin=alt.Bin(maxbins=30), title=hist_column),
-                y=alt.Y("count()", title="Количество"),
-                color=alt.Color(
-                    "group:N",
-                    scale=alt.Scale(domain=color_domain, range=color_range),
-                    legend=alt.Legend(title="Группа"),
-                ),
-            )
-            .properties(height=height)
-        )
-    return chart
-
+def build_histogram(chart_data, hist_column, color_domain, color_range, normalize, height=400):
+    bins = np.histogram_bin_edges(chart_data[hist_column].dropna(), bins=30)
+    bin_centers = 0.5 * (bins[1:] + bins[:-1])
+    fig = go.Figure()
+    for group in color_domain:
+        df = chart_data[chart_data["group"] == group]
+        counts, _ = np.histogram(df[hist_column].dropna(), bins=bins)
+        if normalize:
+            total = counts.sum()
+            if total > 0:
+                counts = counts / total
+        color = "#FF0000" if group == "Глобальный" else color_range[color_domain.index(group)]
+        fig.add_trace(go.Bar(x=bin_centers, y=counts, name=group, marker_color=color, opacity=0.7))
+    fig.update_layout(barmode="overlay", height=height, xaxis_title=hist_column, yaxis_title="Доля" if normalize else "Количество")
+    return fig
 
 def build_scatter(chart_data, x_col, y_col, color_domain, color_range, height=400):
-    chart = (
-        alt.Chart(chart_data)
-        .mark_circle(size=60)
-        .encode(
-            x=alt.X(f"{x_col}:Q", title=x_col),
-            y=alt.Y(f"{y_col}:Q", title=y_col),
-            color=alt.Color(
-                "group:N",
-                scale=alt.Scale(domain=color_domain, range=color_range),
-                legend=alt.Legend(title="Группа"),
-            ),
-            tooltip=list(chart_data.columns),
-        )
-        .interactive()
-        .properties(height=height)
-    )
-    return chart
+    color_map = {group: ("#FF0000" if group == "Глобальный" else color_range[color_domain.index(group)]) for group in color_domain}
+    fig = px.scatter(chart_data, x=x_col, y=y_col, color="group", color_discrete_map=color_map)
+    fig.update_traces(marker=dict(size=10))
+    fig.update_layout(height=height, xaxis_title=x_col, yaxis_title=y_col)
+    return fig
 
-
-def build_depletion_chart(
-    depletion_curves_file,
-    selected_groups,
-    global_filtered_data,
-    group_configs,
-    show_individual=False,
-    height=400,
-):
+def build_depletion_chart(depletion_curves_file, selected_groups, global_filtered_data, group_configs, show_individual=False, height=400):
     depletion_curves = load_depletion_curves(depletion_curves_file)
     if depletion_curves.empty:
         return None
     combined_data = pd.DataFrame()
     individual_data = pd.DataFrame()
     for g in selected_groups:
-        house_ids = (
-            global_filtered_data["house_id"].unique()
-            if g == "Глобальный"
-            else group_configs[g]["filtered_data"]["house_id"].unique()
-        )
+        if g == "Глобальный":
+            house_ids = global_filtered_data["house_id"].unique()
+        else:
+            house_ids = group_configs[g]["filtered_data"]["house_id"].unique()
         avg_df = compute_avg_depletion_curve(depletion_curves, house_ids)
         if not avg_df.empty:
             avg_df["group"] = g
             combined_data = pd.concat([combined_data, avg_df], ignore_index=True)
         if show_individual:
-            indiv = depletion_curves[
-                depletion_curves["house_id"].isin(house_ids)
-            ].copy()
+            indiv = depletion_curves[depletion_curves["house_id"].isin(house_ids)].copy()
             if not indiv.empty:
                 indiv["group"] = g
                 individual_data = pd.concat([individual_data, indiv], ignore_index=True)
     if combined_data.empty:
         return None
-    base_chart = (
-        alt.Chart(combined_data)
-        .mark_line(strokeWidth=3, interpolate="step-after")
-        .encode(
-            x=alt.X("time:Q", title="Время (дни)"),
-            y=alt.Y("pct:Q", title="Средний остаток продаж (%)"),
-            color=alt.Color("group:N", legend=alt.Legend(title="Группа")),
-        )
-        .properties(height=height)
-    )
+    fig = go.Figure()
+    color_map = {group: ("#FF0000" if group == "Глобальный" else group_configs[group]["vis"]["color"]) for group in selected_groups}
+    for group in combined_data["group"].unique():
+        df = combined_data[combined_data["group"] == group]
+        fig.add_trace(go.Scatter(x=df["time"], y=df["pct"], mode="lines", line=dict(width=3, shape="hv", color=color_map.get(group, "#0000FF")), name=group))
     if show_individual and not individual_data.empty:
-        indiv_chart = (
-            alt.Chart(individual_data)
-            .mark_line(interpolate="step-after", opacity=0.6)
-            .encode(
-                x=alt.X("time:Q", title="Время (дни)"),
-                y=alt.Y("pct:Q", title="Остаток продаж (%)"),
-                color=alt.Color("group:N", legend=None),
-                detail="house_id:N",
-            )
-            .properties(height=height)
-        )
-        final_chart = (
-            alt.layer(base_chart, indiv_chart)
-            .resolve_scale(color="independent")
-            .properties(height=height)
-        )
-    else:
-        final_chart = base_chart
-    return final_chart
+        for group in individual_data["group"].unique():
+            df = individual_data[individual_data["group"] == group]
+            for hid in df["house_id"].unique():
+                dff = df[df["house_id"] == hid]
+                fig.add_trace(go.Scatter(x=dff["time"], y=dff["pct"], mode="lines", line=dict(width=2, shape="hv", color=color_map.get(group, "#0000FF")), opacity=0.6, showlegend=False))
+    fig.update_layout(height=height, xaxis_title="Время (дни)", yaxis_title="Остаток продаж (%)")
+    return fig
