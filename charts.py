@@ -1,3 +1,4 @@
+# charts.py
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
@@ -16,7 +17,14 @@ def build_histogram(chart_data, hist_column, color_domain, color_range, normaliz
             if total > 0:
                 counts = counts / total
         color = "#FF0000" if group == "Глобальный" else color_range[color_domain.index(group)]
-        fig.add_trace(go.Bar(x=bin_centers, y=counts, name=group, marker_color=color, opacity=0.7))
+        fig.add_trace(go.Bar(
+            x=bin_centers,
+            y=counts,
+            name=group,
+            marker_color=color,
+            opacity=0.5,
+            marker_line_width=1
+        ))
     fig.update_layout(barmode="overlay", height=height, xaxis_title=hist_column, yaxis_title="Доля" if normalize else "Количество")
     return fig
 
@@ -53,12 +61,29 @@ def build_depletion_chart(depletion_curves_file, selected_groups, global_filtere
     color_map = {group: ("#FF0000" if group == "Глобальный" else group_configs[group]["vis"]["color"]) for group in selected_groups}
     for group in combined_data["group"].unique():
         df = combined_data[combined_data["group"] == group]
-        fig.add_trace(go.Scatter(x=df["time"], y=df["pct"], mode="lines", line=dict(width=3, shape="hv", color=color_map.get(group, "#0000FF")), name=group))
+        fig.add_trace(go.Scatter(
+            x=df["time"],
+            y=df["pct"],
+            mode="lines",
+            line=dict(width=3, shape="hv", color=color_map.get(group, "#0000FF")),
+            name=group
+        ))
     if show_individual and not individual_data.empty:
+        max_individual = 100
         for group in individual_data["group"].unique():
             df = individual_data[individual_data["group"] == group]
-            for hid in df["house_id"].unique():
+            unique_house_ids = df["house_id"].unique()
+            if len(unique_house_ids) > max_individual:
+                unique_house_ids = np.random.choice(unique_house_ids, max_individual, replace=False)
+            for hid in unique_house_ids:
                 dff = df[df["house_id"] == hid]
-                fig.add_trace(go.Scatter(x=dff["time"], y=dff["pct"], mode="lines", line=dict(width=2, shape="hv", color=color_map.get(group, "#0000FF")), opacity=0.6, showlegend=False))
+                fig.add_trace(go.Scatter(
+                    x=dff["time"],
+                    y=dff["pct"],
+                    mode="lines",
+                    line=dict(width=1, shape="hv", color=color_map.get(group, "#0000FF")),
+                    opacity=0.3,
+                    showlegend=False
+                ))
     fig.update_layout(height=height, xaxis_title="Время (дни)", yaxis_title="Остаток продаж (%)")
     return fig
