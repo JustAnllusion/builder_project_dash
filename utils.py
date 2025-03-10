@@ -205,3 +205,10 @@ def safe_multiselect(label, options, default, key):
     if not safe_default:
         safe_default = options
     return st.multiselect(label, options=options, default=safe_default, key=key)
+
+
+def get_unique_chart_key(prefix="chart"):
+    if "unique_chart_key_counter" not in st.session_state:
+        st.session_state.unique_chart_key_counter = 0
+    st.session_state.unique_chart_key_counter += 1
+    return f"{prefix}_{st.session_state.unique_chart_key_counter}"

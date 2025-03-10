@@ -19,7 +19,6 @@ from utils import (
 )
 from charts import build_histogram, build_scatter, build_depletion_chart
 
-# Функция для генерации уникального ключа (для других виджетов)
 def get_unique_widget_key(prefix="widget"):
     if "unique_widget_key_counter" not in st.session_state:
         st.session_state.unique_widget_key_counter = 0
@@ -486,7 +485,6 @@ with tab_analysis:
         ["Индивидуальное построение", "Множественное построение"]
     )
     
-    # Инициализация счётчика графиков для уникальных id (не перезаписывается при удалении)
     if "chart_counter" not in st.session_state:
         st.session_state.chart_counter = 0
 
@@ -517,7 +515,6 @@ with tab_analysis:
             }
             st.session_state.graph_configs.append(default_config)
             
-        # Отображение и настройка каждого графика
         for config in st.session_state.graph_configs:
             with st.container():
                 colA, colB = st.columns(2)
@@ -669,12 +666,10 @@ with tab_analysis:
                 if st.button(
                     f"Удалить график {config['name']}", key=f"delete_chart_{config['id']}"
                 ):
-                    # Удаляем график по его id
                     st.session_state.graph_configs = [
                         cfg for cfg in st.session_state.graph_configs if cfg["id"] != config["id"]
                     ]
                     st.experimental_rerun()
-                # Генерируем уникальный ключ для отображения графика
                 unique_key = f"chart_{config['id']}_{config['chart_type']}"
                 if config["chart_type"] == "Гистограмма":
                     hist_column = config["histogram"]["column"]
