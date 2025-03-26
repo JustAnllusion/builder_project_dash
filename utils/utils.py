@@ -1,7 +1,6 @@
 import colorsys
 import io
 import json
-
 import altair as alt
 import numpy as np
 import pandas as pd
@@ -133,45 +132,6 @@ alt.themes.register("custom_theme", set_altair_theme)
 alt.themes.enable("custom_theme")
 
 
-def numeric_filter_widget(col, data, key_prefix):
-    if data.empty:
-        return (0.0, 0.0)
-    min_val = float(data.min())
-    max_val = float(data.max())
-    if min_val == max_val:
-        st.write(f"Столбец «{col}» имеет константное значение: {min_val}.")
-        return (min_val, max_val)
-    use_quantile = st.checkbox(
-        f"Фильтровать по квантилям для «{col}»", key=f"{key_prefix}_quantile_{col}"
-    )
-    if use_quantile:
-        quantile_range = st.slider(
-            f"Выберите квантильный диапазон для «{col}»",
-            min_value=0.0,
-            max_value=1.0,
-            value=(0.0, 1.0),
-            step=0.01,
-            key=f"{key_prefix}_quantile_range_{col}",
-        )
-        lower_q, upper_q = quantile_range
-        lower_bound = float(data.quantile(lower_q))
-        upper_bound = float(data.quantile(upper_q))
-        st.info(
-            f"Фильтрация: [{lower_q:.2f} → {upper_q:.2f}] (соответствует [{lower_bound:.2f} → {upper_bound:.2f}])"
-        )
-        return (lower_bound, upper_bound)
-    else:
-        slider_val = st.slider(
-            f"Фильтр для «{col}»",
-            min_value=min_val,
-            max_value=max_val,
-            value=(min_val, max_val),
-            key=f"{key_prefix}_{col}",
-        )
-        return slider_val
-
-
-@st.cache_data(show_spinner=False)
 def compute_avg_depletion_curve(
     depletion_curves: pd.DataFrame, house_ids: np.array
 ) -> pd.DataFrame:
@@ -198,10 +158,3 @@ def compute_smart_group_name(group):
     if parts:
         return " & ".join(parts)
     return group.get("group_name", "Группа")
-
-
-def safe_multiselect(label, options, default, key):
-    safe_default = [x for x in default if x in options]
-    if not safe_default:
-        safe_default = options
-    return st.multiselect(label, options=options, default=safe_default, key=key)
