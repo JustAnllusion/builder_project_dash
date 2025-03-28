@@ -1,11 +1,11 @@
 import colorsys
 import io
-import json
+
 import altair as alt
 import numpy as np
 import pandas as pd
-import pydeck as pdk
 import streamlit as st
+from scipy.optimize import minimize
 
 
 def convert_df_to_csv(df: pd.DataFrame) -> bytes:
@@ -158,3 +158,35 @@ def compute_smart_group_name(group):
     if parts:
         return " & ".join(parts)
     return group.get("group_name", "Группа")
+
+
+def find_segment_for_elasticity(
+    x: float, area_min: float, area_max: float, step: int
+) -> int:
+    area_min_i = int(area_min)
+    area_max_i = int(area_max)
+    step_i = int(step)
+
+    segments = list(range(area_min_i, area_max_i + step_i, step_i))
+    for i in range(len(segments) - 1):
+        if segments[i] <= x < segments[i + 1]:
+            return segments[i]
+    return segments[-1]
+
+
+def fit_hyperbolic_alpha(series: pd.Series) -> float:
+
+    def g(deg, emp):
+        return sum(
+            ((emp.index[0] ** deg) / (emp.index[i] ** deg) - emp.iloc[i]) ** 2
+            for i in range(len(emp))
+        )
+
+    def temp_func(x):
+        return g(x, series)
+
+    try:
+        alpha = float(minimize(temp_func, x0=np.array([1])).x[0])
+    except Exception:
+        alpha = 1.0
+    return alpha

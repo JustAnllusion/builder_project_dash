@@ -2,8 +2,11 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
-from utils.utils import compute_avg_depletion_curve, load_depletion_curves
+from utils.utils import (compute_avg_depletion_curve,
+                         find_segment_for_elasticity, fit_hyperbolic_alpha,
+                         load_depletion_curves)
 
 
 def build_histogram(
@@ -135,4 +138,146 @@ def build_depletion_chart(
     fig.update_layout(
         height=height, xaxis_title="Время (дни)", yaxis_title="Остаток продаж (%)"
     )
+    return fig
+
+
+def build_elasticity_chart(
+    selected_groups: list,
+    global_filtered_data: pd.DataFrame,
+    group_configs: dict,
+    apartment_data: pd.DataFrame,
+    area_min: float,
+    area_max: float,
+    split_parameter: int,
+    rooms_list: list,
+):
+    if not rooms_list:
+        return None
+
+    categories = []
+    for r in rooms_list:
+        if r is None:
+            categories.append(("Все сделки", None))
+        elif r == 0:
+            categories.append(("Студия", 0))
+        elif r == 1:
+            categories.append(("1 комната", 1))
+        elif r == 2:
+            categories.append(("2 комнаты", 2))
+        elif r == 3:
+            categories.append(("3 комнаты", 3))
+        else:
+            categories.append((f"{r} комнат", r))
+
+    fig = make_subplots(
+        rows=len(categories),
+        cols=1,
+        shared_xaxes=False,
+        vertical_spacing=0.08,
+        subplot_titles=[cat[0] for cat in categories],
+        specs=[[{"secondary_y": True}] for _ in categories],
+    )
+
+    color_map = {}
+    for g in selected_groups:
+        if g == "Глобальный":
+            color_map[g] = "#FF0000"
+        else:
+            color_map[g] = group_configs[g]["vis"]["color"]
+
+    for idx, (cat_name, rooms_val) in enumerate(categories, start=1):
+        row_i = idx
+
+        for group in selected_groups:
+            if group == "Глобальный":
+                house_ids = global_filtered_data["house_id"].unique()
+            else:
+                house_ids = group_configs[group]["filtered_data"]["house_id"].unique()
+
+            df_g = apartment_data[apartment_data["house_id"].isin(house_ids)].copy()
+            if rooms_val is not None:
+                df_g = df_g[df_g["rooms_number"] == rooms_val]
+            df_g = df_g.dropna(subset=["area", "price"])
+
+            df_g = df_g[(df_g["area"] >= area_min) & (df_g["area"] <= area_max)]
+            if df_g.empty:
+                continue
+
+            df_g["area_seg"] = df_g["area"].apply(
+                lambda x: find_segment_for_elasticity(
+                    x, area_min, area_max, split_parameter
+                )
+            )
+
+            list_of_curves = []
+            for hid, sub_df in df_g.groupby("house_id"):
+                seg_mean = sub_df.groupby("area_seg")["price"].mean().sort_index()
+                if seg_mean.empty:
+                    continue
+                first_val = seg_mean.iloc[0]
+                norm_curve = seg_mean / first_val if first_val != 0 else seg_mean
+                list_of_curves.append(norm_curve)
+
+            if not list_of_curves:
+                continue
+
+            all_idx = sorted(set().union(*(c.index for c in list_of_curves)))
+            aligned = []
+            for c in list_of_curves:
+                aligned.append(c.reindex(all_idx, method="ffill"))
+            avg_curve = pd.concat(aligned, axis=1).mean(axis=1)
+
+            alpha = fit_hyperbolic_alpha(avg_curve)
+            hyperbolic = (avg_curve.index[0] ** alpha) / (avg_curve.index**alpha)
+
+            fig.add_trace(
+                go.Scatter(
+                    x=avg_curve.index,
+                    y=avg_curve.values,
+                    mode="lines+markers",
+                    name=f"{group} ({cat_name})",
+                    line=dict(color=color_map[group]),
+                ),
+                row=row_i,
+                col=1,
+                secondary_y=False,
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=avg_curve.index,
+                    y=hyperbolic,
+                    mode="lines",
+                    name=f"Гипербола {group} ({cat_name})",
+                    line=dict(color=color_map[group], dash="dash"),
+                ),
+                row=row_i,
+                col=1,
+                secondary_y=False,
+            )
+
+            deals_count = df_g.groupby("area_seg").size()
+            x_vals = deals_count.index + split_parameter / 2.0
+            fig.add_trace(
+                go.Bar(
+                    x=x_vals,
+                    y=deals_count.values,
+                    name=f"Сделок {group} ({cat_name})",
+                    marker_color=color_map[group],
+                    opacity=0.4,
+                ),
+                row=row_i,
+                col=1,
+                secondary_y=True,
+            )
+
+    fig.update_layout(
+        height=220 * len(categories),
+        title=f"Кривая эластичности (шаг={split_parameter} кв.м)",
+        showlegend=True,
+    )
+
+    for i in range(len(categories)):
+        fig.update_yaxes(title_text="Норм. цена", row=i + 1, col=1, secondary_y=False)
+        fig.update_yaxes(title_text="Кол-во сделок", row=i + 1, col=1, secondary_y=True)
+
     return fig

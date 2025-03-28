@@ -1,0 +1,24 @@
+.sidebar-header {
+    font-size: 20px;
+    font-weight: bold;
+    padding-bottom: 5px;
+    margin-bottom: 10px;
+    border-bottom: 2px solid #ccc;
+}
+.sidebar-divider {
+    height: 1px;
+    background-color: #ccc;
+    margin: 10px 0;
+}
+.sidebar-description {
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 15px;
+}
+.section-header {
+    font-size: 28px;
+    font-weight: bold;
+    border-bottom: 2px solid #ccc;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
+}

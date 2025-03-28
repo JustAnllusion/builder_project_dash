@@ -7,6 +7,10 @@ st.set_page_config(
     page_title="Анализ данных Москвы", layout="wide", initial_sidebar_state="expanded"
 )
 
+with open("assets/styles.css") as f:
+    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+
 apartment_data = load_data("msk_prep.feather")
 house_data = load_data("msk_apartment.feather")
 

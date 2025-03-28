@@ -1,8 +1,10 @@
-import streamlit as st
 import json
+
 import pandas as pd
-from utils.utils import get_top_categories, compute_smart_group_name
+import streamlit as st
+
 from components.widgets import numeric_filter_widget
+from utils.utils import compute_smart_group_name, get_top_categories
 
 
 def render_sidebar(house_data: pd.DataFrame):
