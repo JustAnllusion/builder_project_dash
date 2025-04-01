@@ -1,6 +1,5 @@
 import pandas as pd
 import streamlit as st
-
 from utils.utils import download_ui
 
 
@@ -17,15 +16,14 @@ def render_data_tab(
     default_rows = (
         100 if max_table_rows >= 100 else (max_table_rows if max_table_rows > 0 else 1)
     )
-
     num_rows = st.number_input(
         "Количество строк для отображения",
         min_value=1,
         max_value=max_table_rows if max_table_rows > 0 else 1,
         value=default_rows,
         step=1,
+        key="data_tab_num_rows",
     )
-
     percentage = (max_table_rows / total_rows * 100) if total_rows > 0 else 0
     st.write(
         f"Найдено строк: **{max_table_rows}** из **{total_rows}** ({percentage:.2f}%)"
