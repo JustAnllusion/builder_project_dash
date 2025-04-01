@@ -190,3 +190,14 @@ def fit_hyperbolic_alpha(series: pd.Series) -> float:
     except Exception:
         alpha = 1.0
     return alpha
+
+
+def apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
+    filtered_df = df.copy()
+    for col, filter_val in filters.items():
+        if isinstance(filter_val, tuple):
+            filtered_df = filtered_df[(filtered_df[col] >= filter_val[0]) & (filtered_df[col] <= filter_val[1])]
+        else:
+            if filter_val:  
+                filtered_df = filtered_df[filtered_df[col].isin(filter_val)]
+    return filtered_df
