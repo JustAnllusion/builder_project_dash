@@ -34,11 +34,19 @@ jobs:
           script: |
             docker stop app || true
             docker rm app || true
-            docker rmi streamlit-app || true
+
             cd /home/${{ secrets.VM_USER }}
+
+            # Удаляем старую копию репо, если надо
             rm -rf builder_project_dash || true
+
+            # Клонируем свежую версию
             git clone git@github.com:JustAnllusion/builder_project_dash.git
             cd builder_project_dash
+
+            # Собираем Docker-образ заново
             docker build -t streamlit-app .
+
+            # Запускаем новый контейнер на порту 80 (пробрасывая 8501 внутри)
             docker run -d --name app -p 80:8501 streamlit-app
 
