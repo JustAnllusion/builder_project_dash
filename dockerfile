@@ -11,4 +11,3 @@ ENV STREAMLIT_TELEMETRY_ENABLED=false
 EXPOSE 8501
 
 CMD ["streamlit", "run", "main.py", "--server.port=8501", "--server.headless=true"]
-

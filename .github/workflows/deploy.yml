@@ -30,7 +30,6 @@ jobs:
           host: ${{ secrets.VM_IP }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
-          passphrase: ${{ secrets.VM_PASSPHRASE }}
           script: |
             docker stop app || true
             docker rm app || true
