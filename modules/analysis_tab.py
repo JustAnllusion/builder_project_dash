@@ -11,8 +11,8 @@ from components.widgets import safe_multiselect
 
 def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataFrame, group_configs: dict):
     st.markdown("<div class='section-header'>Анализ данных</div>", unsafe_allow_html=True)
+    city_key = st.session_state.get("city_key", "msk")
     
-    # Инициализация параметров графиков
     if "chart_counter" not in st.session_state:
         st.session_state.chart_counter = 0
     if "graph_configs" not in st.session_state:
@@ -23,7 +23,7 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
         default_config = {
             "id": default_id,
             "name": f"График {default_id}",
-            "chart_type": "Кривая эластичности",  # по умолчанию эластичность
+            "chart_type": "Кривая эластичности", 
             "selected_groups": ["Глобальный"] + (list(group_configs.keys()) if group_configs else []),
             "histogram": {
                 "column": "mean_price",
@@ -40,12 +40,11 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
             },
             "depletion": {"show_individual": False},
             "elasticity": {
-                "split": 1,  # шаг сегментации по умолчанию от 1 до 5
+                "split": 1, 
             },
         }
         st.session_state.graph_configs.append(default_config)
         
-    # Отрисовка каждого графика
     for config in st.session_state.graph_configs:
         with st.container():
             colA, colB = st.columns(2)
@@ -55,7 +54,7 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                 )
             with colB:
                 chart_options = ["Гистограмма", "Скатерплот", "Кривая выбытия", "Кривая эластичности"]
-                # Используем отдельную переменную для выбранного типа графика
+                
                 selected_chart_type = st.selectbox(
                     "Тип графика",
                     options=chart_options,
@@ -165,7 +164,6 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                     
                 elif config["chart_type"] == "Кривая эластичности":
                     st.markdown("**Настройки кривой эластичности**", unsafe_allow_html=True)
-                    # Оставляем только выбор шага сегментации от 1 до 5, без фильтрации по комнатности
                     config["elasticity"]["split"] = st.slider(
                         "Шаг сегментации (кв.м.)",
                         min_value=1,
@@ -176,7 +174,6 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                     )
                     
             unique_key = f"chart_{config['id']}_{config['chart_type']}"
-            # Отрисовка графиков по типу
             if config["chart_type"] == "Гистограмма":
                 hist_col = config["histogram"]["column"]
                 log_transform = config["histogram"]["log_transform"]
@@ -230,8 +227,9 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                     st.plotly_chart(fig_scatter, use_container_width=True, key=unique_key)
                     
             elif config["chart_type"] == "Кривая выбытия":
+                depletion_curve_path = f"data/regions/{city_key}/market_deals/cache/depletion_curves.feather"
                 fig_dep = build_depletion_chart(
-                    "data/regions/msk/market_deals/cache/depletion_curves.feather",
+                    depletion_curve_path,
                     config["selected_groups"],
                     global_filtered_data,
                     group_configs,
