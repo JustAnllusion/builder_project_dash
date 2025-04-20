@@ -58,6 +58,6 @@ if __name__ == '__main__':
     cities = ["msk", "ekb"] 
     for city in cities:
         data_path = os.path.join("data", "regions", city, "market_deals", f"{city}_prep.feather")
-        output_path = os.path.join("data", "regions", city, "market_deals", "cache", "elasticity_curves_precomputed.feather")
+        output_path = os.path.join("data", "regions", city, "market_deals", "cache", "elasticity_curves.feather")
         print(f"Обработка города: {city}")
         precompute_elasticity_curves_all_steps(data_path, output_path)

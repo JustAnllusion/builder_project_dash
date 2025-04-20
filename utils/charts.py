@@ -108,7 +108,7 @@ def build_depletion_chart(depletion_curves_file, selected_groups, global_filtere
 def build_elasticity_chart(selected_groups, global_filtered_data, group_configs, split_parameter):
 
     city_key = st.session_state.get("city_key", "msk")
-    precomputed_path = f"data/regions/{city_key}/market_deals/cache/elasticity_curves_precomputed.feather"
+    precomputed_path = f"data/regions/{city_key}/market_deals/cache/elasticity_curves.feather"
     try:
         precomputed = pd.read_feather(precomputed_path)
     except Exception as e:
