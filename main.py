@@ -60,6 +60,7 @@ if authentication_status:
             st.session_state.active_city = selected_city
             st.session_state.data_loaded = True
         house_data = st.session_state.house_data
+        apartment_data = st.session_state.apartment_data
 
     tabs = ["Данные", "Карта объектов", "Анализ", "Предсказание", "Кластеризация"]
 
@@ -83,7 +84,7 @@ if authentication_status:
     elif active_tab == "Предсказание":
         render_prediction_tab()
     elif active_tab == "Кластеризация":
-        render_clustering_tab()
+        render_clustering_tab(st.session_state.apartment_data,group_configs)
 
 else:
     st.warning("Пожалуйста, введите имя пользователя и пароль")
