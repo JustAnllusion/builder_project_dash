@@ -99,10 +99,13 @@ def load_data(file_path):
         st.error(f"Ошибка загрузки данных из {file_path}: {e}")
         return pd.DataFrame()
 
+def get_top_categories(data, column=None, top_n=5):
+    if isinstance(data, pd.Series):
+        return data.value_counts().head(top_n).index.tolist()
 
-def get_top_categories(df, column, top_n=5):
-    if column in df.columns:
-        return df[column].value_counts().head(top_n).index.tolist()
+    if column and column in data.columns:
+        return data[column].value_counts().head(top_n).index.tolist()
+
     return []
 
 

@@ -5,18 +5,17 @@ from components.widgets import numeric_filter_widget, categorical_filter_widget
 from utils.utils import compute_smart_group_name, get_top_categories, apply_filters
 
 def render_sidebar(house_data: pd.DataFrame):
+    
+    
     if "dynamic_groups" not in st.session_state:
         st.session_state.dynamic_groups = []
     if "processed_json_files" not in st.session_state:
         st.session_state.processed_json_files = []
 
-    # Новый блок: выбор города
     st.sidebar.markdown("<div class='sidebar-header'>Выбор города</div>", unsafe_allow_html=True)
-    cities = ["Москва", "Новосибирск", "Екатеринбург", "Челябинск"]
+    cities = ["Москва","Екатеринбург"]
     selected_city = st.sidebar.selectbox("Город:", cities)
     st.session_state["selected_city"] = selected_city
-    if selected_city != "Москва":
-        st.sidebar.info("Пока реализована только Москва — будут использованы данные Москвы.")
 
     st.sidebar.markdown("<div class='sidebar-divider'></div>", unsafe_allow_html=True)
     st.sidebar.markdown("<div class='sidebar-header'>Группы</div>", unsafe_allow_html=True)
@@ -108,12 +107,21 @@ def render_sidebar(house_data: pd.DataFrame):
                 group["group_color"] = st.color_picker(
                     "Цвет группы", value=group["group_color"], key=f"group_color_{idx}"
                 )
-                group["selected_filter_columns"] = st.multiselect(
-                    "Признаки для фильтрации",
-                    options=list(house_data.columns),
-                    default=group.get("selected_filter_columns", []),
-                    key=f"group_filter_columns_{idx}",
-                )
+          
+
+              
+                try:
+                    columns_sorted = sorted(house_data.columns, key=str.lower)
+                    columns_filtered = [col for col in columns_sorted if (col != "start_sales") and (col.isalpha())]
+
+
+                    group["selected_filter_columns"] = st.multiselect(
+                        "Признаки для фильтрации",
+                        options=columns_filtered,
+                        default=group.get("selected_filter_columns", []),
+                        key=f"group_filter_columns_{idx}" )
+                except Exception as e:
+                    ...
 
                 column_filters = {}
                 for col in group["selected_filter_columns"]:
@@ -132,5 +140,5 @@ def render_sidebar(house_data: pd.DataFrame):
                     "filtered_data": group["filtered_data"],
                     "vis": {"color": group["group_color"], "opacity": 200, "radius": 50, "show": True},
                 }
-    # Возвращаем исходные данные (без глобальной фильтрации), конфигурации групп и выбранный город
+
     return house_data, group_configs, selected_city

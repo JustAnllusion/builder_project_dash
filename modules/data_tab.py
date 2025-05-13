@@ -63,7 +63,7 @@ def render_data_tab(
 
     if group_configs:
         st.markdown("<hr>", unsafe_allow_html=True)
-        st.markdown("<div class='section-header'>👥 Группы</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-header'>Группы</div>", unsafe_allow_html=True)
 
         for grp, config in group_configs.items():
             grp_df = config["filtered_data"]
