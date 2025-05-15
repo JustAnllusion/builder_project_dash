@@ -465,7 +465,7 @@ def make_new_clusterisation(msk_prep,house_ids):
   data_cl_scaled = scaler.fit_transform(data_cl)
 
   n_cl = 7
-  kmeans = KMeans(n_clusters=n_cl, random_state=1)
+  kmeans = KMeans(n_clusters=n_cl, random_state=1,n_init=10)
 
   data['KMeans'] = -1
 
