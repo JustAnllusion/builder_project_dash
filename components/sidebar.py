@@ -112,7 +112,7 @@ def render_sidebar(house_data: pd.DataFrame):
               
                 try:
                     columns_sorted = sorted(house_data.columns, key=str.lower)
-                    columns_filtered = [col for col in columns_sorted if (col != "start_sales") and (col.isalpha())]
+                    columns_filtered = [col for col in columns_sorted if (col != "start_sales")]
 
 
                     group["selected_filter_columns"] = st.multiselect(
