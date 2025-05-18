@@ -84,7 +84,7 @@ if authentication_status:
     elif active_tab == "Предсказание":
         render_prediction_tab()
     elif active_tab == "Кластеризация":
-        render_clustering_tab(st.session_state.apartment_data,group_configs)
+        render_clustering_tab(st.session_state.apartment_data,group_configs,city_key)
 
 else:
     st.warning("Пожалуйста, введите имя пользователя и пароль")

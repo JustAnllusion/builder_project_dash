@@ -2,19 +2,26 @@ import streamlit as st
 import pickle
 import modules.figures as figures
 import pandas as pd
+import os
 
-def render_clustering_tab(apartment_data: pd.DataFrame,group_configs: dict):
-    house_data_cluster = apartment_data.copy()  #(
-    ir = figures.get_interest_rate(house_data_cluster, is_ml=False)
-    house_data_cluster["discounting_price"] = figures.discounting(house_data_cluster, ir)
-    house_data_cluster["discounting_price"] = house_data_cluster["discounting_price"] * ir[-1]
-    house_data_cluster['total_price_discounted'] = house_data_cluster['area'] * house_data_cluster['discounting_price']
+def render_clustering_tab(apartment_data: pd.DataFrame,group_configs: dict,city_key: str):
+    # house_data_cluster = apartment_data.copy()  #(
+    ir = figures.get_interest_rate(apartment_data, is_ml=False)
+    apartment_data["discounting_price"] = figures.discounting(apartment_data, ir)
+    apartment_data["discounting_price"] = apartment_data["discounting_price"] * ir.iloc[-1]
+    apartment_data['total_price_discounted'] = apartment_data['area'] * apartment_data['discounting_price']
 
-    with open('fig_clusterisation.pkl', 'wb') as f:
-         pickle.dump(figures.make_new_clusterisation(house_data_cluster,[]),f)
+    # with open('fig_clusterisation.pkl', 'wb') as f:
+    #      pickle.dump(figures.make_new_clusterisation(apartment_data,[]),f)
+    segmentation_path = os.path.join("data", "regions", city_key, "segmentation",f"{city_key}_fig_clusterisation.pkl")
 
-    with open('fig_clusterisation.pkl', 'rb') as f:
-        base_fig = pickle.load(f)
+    try:
+        with open(segmentation_path, 'rb') as f:
+            base_fig = pickle.load(f)
+    except Exception as e:
+            print(f"Ошибка загрузки сегментации для города {city_key}: {e}")
+            st.warning(f"Отсутствует доступная сегментации для данного города.")
+            return -1
     
     if "voronoi_fig" not in st.session_state:
         st.session_state.voronoi_fig = base_fig
@@ -23,7 +30,7 @@ def render_clustering_tab(apartment_data: pd.DataFrame,group_configs: dict):
         "<div class='section-header'>Сегментация</div>", unsafe_allow_html=True
     )
     required_cols = {"house_id", "total_price_discounted", "discounting_price", "start_sales"}
-    if not required_cols.issubset(house_data_cluster.columns):
+    if not required_cols.issubset(apartment_data.columns):
         
         st.warning(f"Для корректной работы необходимы столбцы: {', '.join(required_cols)}")
     else:
@@ -81,7 +88,7 @@ def render_clustering_tab(apartment_data: pd.DataFrame,group_configs: dict):
                 if btn_cols[0].button("Обновить отображение точек"):
                     st.session_state.voronoi_fig = figures.add_points_to_voronoi(
                         base_fig, 
-                        house_data_cluster, 
+                        apartment_data, 
                         unique_house_ids, 
                         group_configs
                     )
