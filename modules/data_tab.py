@@ -67,15 +67,17 @@ def render_data_tab(
 
         for grp, config in group_configs.items():
             grp_df = config["filtered_data"]
+            # Show group header and row count like the global table
+            st.markdown(f"<div class='section-header'>{grp}</div>", unsafe_allow_html=True)
+            rows_grp = len(grp_df)
+            percentage_grp = (rows_grp / total_rows * 100) if total_rows > 0 else 0
+            st.markdown(f"""
+            <div class="data-info-box">
+                Найдено строк: <strong>{rows_grp}</strong> из <strong>{total_rows}</strong> ({percentage_grp:.2f}%)
+            </div>
+            """, unsafe_allow_html=True)
             color = config['vis']['color']
-            with st.expander(f"", expanded=False):
-                # st.markdown(
-                #     f"<div style='display:flex;align-items:center;gap:8px;margin-bottom:10px;'>"
-                #     f"<div style='width:12px;height:12px;background:{color};border-radius:50%;'></div>"
-                #     f"<strong>{grp}</strong> (строк: {len(grp_df)})</div>",
-                #     unsafe_allow_html=True
-                # )
-
+            with st.expander(f"{grp}", expanded=False):
                 available_columns_grp = [col for col in selected_columns if col in grp_df.columns]
                 display_grp_df = grp_df[available_columns_grp].head(num_rows).copy()
 

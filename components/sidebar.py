@@ -87,19 +87,28 @@ def render_sidebar(house_data: pd.DataFrame):
     if st.session_state.dynamic_groups:
         st.sidebar.markdown("<div class='sidebar-header'>Созданные группы</div>", unsafe_allow_html=True)
         for idx, group in enumerate(st.session_state.dynamic_groups.copy()):
-            with st.sidebar.expander(f"{group['group_name']}", expanded=False):
+            with st.sidebar.expander(
+                group["group_name"],
+                expanded=True
+            ):
                 if st.sidebar.button("Удалить группу", key=f"del_group_{idx}"):
                     st.session_state.dynamic_groups.remove(group)
                     st.rerun()
 
                 smart_placeholder = compute_smart_group_name(group)
+                prev_name = group["group_name"]
                 new_name = st.text_input(
                     "Название группы",
-                    value=group["group_name"],
+                    value=prev_name,
                     placeholder=smart_placeholder,
                     key=f"group_name_{idx}",
                 )
-                group["group_name"] = new_name.strip() or smart_placeholder
+                clean_name = new_name.strip() or smart_placeholder
+                if clean_name != prev_name:
+                    group["group_name"] = clean_name
+                    st.rerun()
+                else:
+                    group["group_name"] = clean_name
 
                 if group.get("is_static", False):
                     st.markdown("*Статическая группа (импортирована из JSON)*")
@@ -111,26 +120,37 @@ def render_sidebar(house_data: pd.DataFrame):
 
               
                 try:
-                    columns_sorted = sorted(house_data.columns, key=str.lower)
-                    columns_filtered = [col for col in columns_sorted if (col != "start_sales")]
 
+                    columns_filtered = sorted(
+                        (col for col in house_data.columns if col != "start_sales"),
+                        key=lambda x: (any(c.isdigit() for c in x), x.lower())
+                    )
 
-                    group["selected_filter_columns"] = st.multiselect(
+                    prev_selected = group.get("selected_filter_columns", [])
+                    new_selected = st.multiselect(
                         "Признаки для фильтрации",
                         options=columns_filtered,
-                        default=group.get("selected_filter_columns", []),
-                        key=f"group_filter_columns_{idx}" )
+                        default=prev_selected,
+                        key=f"group_filter_columns_{idx}"
+                    )
+                    if new_selected != prev_selected:
+                        group["selected_filter_columns"] = new_selected
+                        st.rerun()
+                    else:
+                        group["selected_filter_columns"] = new_selected
                 except Exception as e:
                     ...
-
                 column_filters = {}
                 for col in group["selected_filter_columns"]:
+                    col_data = group["base_data"][col].dropna()
                     if pd.api.types.is_numeric_dtype(house_data[col]):
-                        col_data = group["base_data"][col].dropna()
-                        column_filters[col] = numeric_filter_widget(col, col_data, key_prefix=f"group_filter_{idx}")
+                        column_filters[col] = numeric_filter_widget(
+                            col, col_data, key_prefix=f"group_filter_{idx}_{col}"
+                        )
                     else:
-                        col_data = group["base_data"][col].dropna()
-                        column_filters[col] = categorical_filter_widget(col, col_data, key_prefix=f"group_filter_{idx}")
+                        column_filters[col] = categorical_filter_widget(
+                            col, col_data, key_prefix=f"group_filter_{idx}_{col}"
+                        )
                 group["column_filters"] = column_filters
                 filtered_df = apply_filters(group["base_data"], column_filters)
                 group["filtered_data"] = filtered_df.copy()
