@@ -46,7 +46,7 @@ def render_map_tab(
     points_for_center = pd.DataFrame()
     global_points = global_filtered_data.dropna(
         subset=["latitude", "longitude", "house_id"]
-    ).copy()[["latitude", "longitude", "house_id"]]
+    ).copy()[["latitude", "longitude", "house_id", "project", "developer"]]
     if toggles.get("Глобальный", False) and not global_points.empty:
         global_layer = pdk.Layer(
             "ScatterplotLayer",
@@ -67,7 +67,7 @@ def render_map_tab(
         grp_data = (
             config["filtered_data"]
             .dropna(subset=["latitude", "longitude", "house_id"])
-            .copy()[["latitude", "longitude", "house_id"]]
+            .copy()[["latitude", "longitude", "house_id", "project", "developer"]]
         )
         if not grp_data.empty:
             key_radius = f"grp_radius_{grp}"

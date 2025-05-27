@@ -281,7 +281,6 @@ def normalize_line(a, b, c, scales, means):
     
     return a_new, b_new, c_new
 
-
 def intersection_point(a1, b1, c1, a2, b2, c2):
   """Находит точку пересечения двух прямых.
 
@@ -307,8 +306,6 @@ def intersection_point(a1, b1, c1, a2, b2, c2):
   y = (a2*c1 - a1*c2) / (a1*b2 - a2*b1)
   
   return [x, y]
-
-
 
 def make_new_clusterisation(msk_prep,house_ids,n_cl = 7):
   data = msk_prep[['total_price_discounted','contract_date','discounting_price','builder','house_id','area']].copy()
@@ -399,7 +396,6 @@ def make_new_clusterisation(msk_prep,house_ids,n_cl = 7):
 
   return fig
 
-
 if __name__ == "__main__":
     cities = ["msk", "ekb"] 
 
@@ -415,7 +411,6 @@ if __name__ == "__main__":
         output_dir = os.path.join("data", "regions", city, "segmentation")
         os.makedirs(output_dir, exist_ok=True)
         apartment_path = os.path.join(input_dir, f"{city}_prep.feather")
-        # house_path = os.path.join(input_dir, f"{city}_apartment.feather")
         try:
             apartment_data = pd.read_feather(apartment_path)
             # house_data = pd.read_feather(house_path)

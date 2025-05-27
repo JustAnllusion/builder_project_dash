@@ -3,10 +3,11 @@ import pandas as pd
 import streamlit as st
 from components.widgets import numeric_filter_widget, categorical_filter_widget
 from utils.utils import compute_smart_group_name, get_top_categories, apply_filters
+from utils.translations import rus_columns
 
 def render_sidebar(house_data: pd.DataFrame):
-    
-    
+
+
     if "dynamic_groups" not in st.session_state:
         st.session_state.dynamic_groups = []
     if "processed_json_files" not in st.session_state:
@@ -116,9 +117,9 @@ def render_sidebar(house_data: pd.DataFrame):
                 group["group_color"] = st.color_picker(
                     "Цвет группы", value=group["group_color"], key=f"group_color_{idx}"
                 )
-          
 
-              
+
+
                 try:
 
                     columns_filtered = sorted(
@@ -126,30 +127,40 @@ def render_sidebar(house_data: pd.DataFrame):
                         key=lambda x: (any(c.isdigit() for c in x), x.lower())
                     )
 
-                    prev_selected = group.get("selected_filter_columns", [])
-                    new_selected = st.multiselect(
+                    label_map = {rus_columns.get(col, col): col for col in columns_filtered}
+
+                    inv_label_map = {v: k for k, v in label_map.items()}
+                    prev_selected_keys = group.get("selected_filter_columns", [])
+                    prev_selected_labels = [inv_label_map[col] for col in prev_selected_keys if col in inv_label_map]
+                    new_selected_labels = st.multiselect(
                         "Признаки для фильтрации",
-                        options=columns_filtered,
-                        default=prev_selected,
+                        options=list(label_map.keys()),
+                        default=prev_selected_labels,
                         key=f"group_filter_columns_{idx}"
                     )
-                    if new_selected != prev_selected:
-                        group["selected_filter_columns"] = new_selected
+                    # Конвертируем обратно в исходные ключи
+                    selected_keys = [label_map[label] for label in new_selected_labels]
+                    if selected_keys != prev_selected_keys:
+                        group["selected_filter_columns"] = selected_keys
                         st.rerun()
                     else:
-                        group["selected_filter_columns"] = new_selected
+                        group["selected_filter_columns"] = selected_keys
                 except Exception as e:
                     ...
                 column_filters = {}
-                for col in group["selected_filter_columns"]:
+                for i, col in enumerate(group["selected_filter_columns"]):
+                    if i > 0:
+                        st.markdown("---")
                     col_data = group["base_data"][col].dropna()
+                    display_name = rus_columns.get(col, col)
+                    st.markdown(f"**{display_name}**")
                     if pd.api.types.is_numeric_dtype(house_data[col]):
                         column_filters[col] = numeric_filter_widget(
-                            col, col_data, key_prefix=f"group_filter_{idx}_{col}"
+                            display_name, col_data, key_prefix=f"group_filter_{idx}_{col}"
                         )
                     else:
                         column_filters[col] = categorical_filter_widget(
-                            col, col_data, key_prefix=f"group_filter_{idx}_{col}"
+                            display_name, col_data, key_prefix=f"group_filter_{idx}_{col}"
                         )
                 group["column_filters"] = column_filters
                 filtered_df = apply_filters(group["base_data"], column_filters)

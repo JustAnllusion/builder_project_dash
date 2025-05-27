@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 from utils.utils import download_ui
+from utils.translations import rus_columns, st_dataframe
 
 
 def render_data_tab(
@@ -38,14 +39,16 @@ def render_data_tab(
         "deals_sold", "mean_area", "mean_price", "mean_selling_time", "floor"
     ]
     available_columns = [col for col in visible_columns if col in main_table.columns]
-
-    all_columns = list(main_table.columns)
-    selected_columns = st.multiselect(
+    # Показ русских меток, но возвращаем английские ключи
+    label_map = {rus_columns.get(col, col): col for col in available_columns}
+    default_labels = [rus_columns.get(col, col) for col in available_columns]
+    selected_labels = st.multiselect(
         "Выберите колонки для отображения",
-        options=available_columns,
-        default=available_columns,
+        options=list(label_map.keys()),
+        default=default_labels,
         key="data_tab_column_selector"
     )
+    selected_columns = [label_map[label] for label in selected_labels]
 
     display_df = main_table[selected_columns].copy()
 
@@ -55,7 +58,7 @@ def render_data_tab(
     if display_df.empty:
         st.info("Нет данных для отображения.")
     else:
-        st.dataframe(display_df.head(num_rows), use_container_width=True, height=500)
+        st_dataframe(display_df.head(num_rows), use_container_width=True, height=500)
         with st.container():
             st.markdown('<div class="download-panel">', unsafe_allow_html=True)
             download_ui(display_df, "global_data")
@@ -84,7 +87,7 @@ def render_data_tab(
                 for col in display_grp_df.select_dtypes(include=["float", "int"]).columns:
                     display_grp_df[col] = display_grp_df[col].round(2)
 
-                st.dataframe(display_grp_df, use_container_width=True, height=500)
+                st_dataframe(display_grp_df, use_container_width=True, height=500)
 
                 with st.container():
                     st.markdown('<div class="download-panel">', unsafe_allow_html=True)

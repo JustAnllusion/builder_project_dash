@@ -27,7 +27,7 @@ def login():
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
 
-    if cookies.get("logged_in") == "1":
+    if cookies.get("logged_in") == "0":
         username = cookies.get("username")
         name = cookies.get("name")
         

@@ -62,7 +62,7 @@ if authentication_status:
         house_data = st.session_state.house_data
         apartment_data = st.session_state.apartment_data
 
-    tabs = ["Данные", "Карта объектов", "Анализ", "Предсказание", "Кластеризация"]
+    tabs = ["Данные", "Карта объектов", "Анализ", "Кластеризация"]
 
     if "active_tab" not in st.session_state:
         st.session_state.active_tab = tabs[0]

@@ -8,11 +8,22 @@ from utils.charts import (
     build_scatter,
 )
 from components.widgets import safe_multiselect
+from utils.translations import rus_columns
 
 def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataFrame, group_configs: dict):
     st.markdown("<div class='section-header'>Анализ данных</div>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <style>
+        input[type="number"] {
+            max-width: 80px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
     city_key = st.session_state.get("city_key", "msk")
-    
+
     if "chart_counter" not in st.session_state:
         st.session_state.chart_counter = 0
     if "graph_configs" not in st.session_state:
@@ -23,7 +34,7 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
         default_config = {
             "id": default_id,
             "name": f"График {default_id}",
-            "chart_type": "Кривая эластичности", 
+            "chart_type": "Кривая эластичности",
             "selected_groups": ["Глобальный"] + (list(group_configs.keys()) if group_configs else []),
             "histogram": {
                 "column": "mean_price",
@@ -40,11 +51,11 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
             },
             "depletion": {"show_individual": False},
             "elasticity": {
-                "split": 1, 
+                "split": 1,
             },
         }
         st.session_state.graph_configs.append(default_config)
-        
+
     for config in st.session_state.graph_configs:
         with st.container():
             colA, colB = st.columns(2)
@@ -54,7 +65,7 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                 )
             with colB:
                 chart_options = ["Гистограмма", "Скатерплот", "Кривая выбытия", "Кривая эластичности"]
-                
+
                 selected_chart_type = st.selectbox(
                     "Тип графика",
                     options=chart_options,
@@ -64,7 +75,7 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                 if selected_chart_type != config["chart_type"]:
                     config["chart_type"] = selected_chart_type
                     st.rerun()
-                    
+
             available_groups = ["Глобальный"] + (list(group_configs.keys()) if group_configs else [])
             config["selected_groups"] = safe_multiselect(
                 "Группы для анализа",
@@ -72,7 +83,7 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                 default=config.get("selected_groups", []),
                 key=f"chart_groups_{config['id']}"
             )
-            
+
             with st.expander("Настройки графика", expanded=False):
                 if config["chart_type"] == "Гистограмма":
                     st.markdown("**Настройки гистограммы**", unsafe_allow_html=True)
@@ -80,16 +91,19 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                     for g in config["selected_groups"]:
                         df_g = global_filtered_data if g == "Глобальный" else group_configs[g]["filtered_data"]
                         numeric_cols.update(df_g.select_dtypes(include=["number"]).columns.tolist())
-                    numeric_cols = sorted(list(numeric_cols))
+                    numeric_cols = sorted(list(numeric_cols), key=lambda x: (any(c.isdigit() for c in x), x.lower()))
                     default_col = config["histogram"].get("column", None)
                     if default_col not in numeric_cols:
                         default_col = "mean_price" if "mean_price" in numeric_cols else (numeric_cols[0] if numeric_cols else "")
-                    config["histogram"]["column"] = st.selectbox(
+                    hist_label_map = {rus_columns.get(col, col): col for col in numeric_cols}
+                    default_label = rus_columns.get(default_col, default_col)
+                    selected_label = st.selectbox(
                         "Признак для гистограммы",
-                        options=numeric_cols,
-                        index=(numeric_cols.index(default_col) if default_col in numeric_cols else 0),
+                        options=list(hist_label_map.keys()),
+                        index=(list(hist_label_map.keys()).index(default_label) if default_label in hist_label_map else 0),
                         key=f"hist_column_{config['id']}"
                     )
+                    config["histogram"]["column"] = hist_label_map[selected_label]
                     config["histogram"]["log_transform"] = st.checkbox(
                         "Логарифмировать",
                         value=config["histogram"].get("log_transform", False),
@@ -122,38 +136,39 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                         value=config["histogram"].get("normalize", False),
                         key=f"hist_normalize_{config['id']}"
                     )
-                    
+
                 elif config["chart_type"] == "Скатерплот":
                     st.markdown("**Настройки скатерплота**", unsafe_allow_html=True)
                     numeric_cols = set()
                     for g in config["selected_groups"]:
                         df_g = global_filtered_data if g == "Глобальный" else group_configs[g]["filtered_data"]
                         numeric_cols.update(df_g.select_dtypes(include=["number"]).columns.tolist())
-                    numeric_cols = sorted(list(numeric_cols))
-                    default_x = config["scatter"].get("x", "mean_price")
-                    default_y = config["scatter"].get("y", "mean_selling_time")
-                    if default_x not in numeric_cols and numeric_cols:
-                        default_x = numeric_cols[0]
-                    if default_y not in numeric_cols and len(numeric_cols) > 1:
-                        default_y = numeric_cols[1]
-                    config["scatter"]["x"] = st.selectbox(
+                    numeric_cols = sorted(list(numeric_cols), key=lambda x: (any(c.isdigit() for c in x), x.lower()))
+                    scatter_label_map = {rus_columns.get(col, col): col for col in numeric_cols}
+                    default_x_key = config["scatter"].get("x", None)
+                    default_x_label = rus_columns.get(default_x_key, default_x_key)
+                    selected_x_label = st.selectbox(
                         "Ось X",
-                        options=numeric_cols,
-                        index=(numeric_cols.index(default_x) if default_x in numeric_cols else 0),
+                        options=list(scatter_label_map.keys()),
+                        index=(list(scatter_label_map.keys()).index(default_x_label) if default_x_label in scatter_label_map else 0),
                         key=f"scatter_x_{config['id']}"
                     )
-                    config["scatter"]["y"] = st.selectbox(
+                    config["scatter"]["x"] = scatter_label_map[selected_x_label]
+                    default_y_key = config["scatter"].get("y", None)
+                    default_y_label = rus_columns.get(default_y_key, default_y_key)
+                    selected_y_label = st.selectbox(
                         "Ось Y",
-                        options=numeric_cols,
-                        index=(numeric_cols.index(default_y) if default_y in numeric_cols else 0),
+                        options=list(scatter_label_map.keys()),
+                        index=(list(scatter_label_map.keys()).index(default_y_label) if default_y_label in scatter_label_map else 0),
                         key=f"scatter_y_{config['id']}"
                     )
+                    config["scatter"]["y"] = scatter_label_map[selected_y_label]
                     config["scatter"]["normalize"] = st.checkbox(
                         "Нормировать координаты",
                         value=config["scatter"].get("normalize", False),
                         key=f"scatter_normalize_{config['id']}"
                     )
-                    
+
                 elif config["chart_type"] == "Кривая выбытия":
                     st.markdown("**Настройки кривой выбытия**", unsafe_allow_html=True)
                     config["depletion"]["show_individual"] = st.checkbox(
@@ -161,18 +176,52 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                         value=config["depletion"].get("show_individual", False),
                         key=f"depletion_individual_{config['id']}"
                     )
-                    
+
                 elif config["chart_type"] == "Кривая эластичности":
                     st.markdown("**Настройки кривой эластичности**", unsafe_allow_html=True)
-                    config["elasticity"]["split"] = st.slider(
+                    split_options = list(range(1, 6))
+                    default_split = int(config["elasticity"].get("split", 1))
+                    config["elasticity"]["split"] = st.selectbox(
                         "Шаг сегментации (кв.м.)",
-                        min_value=1,
-                        max_value=5,
-                        value=int(config["elasticity"].get("split", 1)),
-                        step=1,
+                        options=split_options,
+                        index=split_options.index(default_split),
                         key=f"elasticity_split_{config['id']}"
                     )
-                    
+
+                    precomputed_path = f"data/regions/{st.session_state.get('city_key','msk')}/market_deals/cache/elasticity_curves.feather"
+                    try:
+                        pre_df = pd.read_feather(precomputed_path)
+                        pre_df = pre_df[pre_df["split_parameter"] == config["elasticity"]["split"]]
+                        seg_min = int(pre_df["area_seg"].min())
+                        seg_max = int(pre_df["area_seg"].max())
+                    except:
+                        seg_min, seg_max = 0, 0
+
+                    default_min = config["elasticity"].get("min_seg", seg_min)
+                    default_max = config["elasticity"].get("max_seg", seg_max)
+                    default_min = max(default_min, seg_min)
+                    default_max = min(default_max, seg_max)
+
+                    col_min, col_max = st.columns(2)
+                    with col_min:
+                        config["elasticity"]["min_seg"] = st.number_input(
+                            "Мин. сегмент",
+                            min_value=seg_min,
+                            max_value=seg_max,
+                            value=default_min,
+                            step=1,
+                            key=f"elasticity_min_seg_{config['id']}"
+                        )
+                    with col_max:
+                        config["elasticity"]["max_seg"] = st.number_input(
+                            "Макс. сегмент",
+                            min_value=seg_min,
+                            max_value=seg_max,
+                            value=default_max,
+                            step=1,
+                            key=f"elasticity_max_seg_{config['id']}"
+                        )
+
             unique_key = f"chart_{config['id']}_{config['chart_type']}"
             if config["chart_type"] == "Гистограмма":
                 hist_col = config["histogram"]["column"]
@@ -201,8 +250,13 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                 else:
                     color_list = [("#FF0000" if g == "Глобальный" else group_configs[g]["vis"]["color"]) for g in config["selected_groups"]]
                     fig_hist = build_histogram(chart_data, hist_col, config["selected_groups"], color_list, normalize, height=400)
+                    fig_hist.update_layout(
+                        xaxis_title=rus_columns.get(hist_col, hist_col),
+                        yaxis_title=rus_columns.get("Количество" if not normalize else "Доля",
+                                                    "Доля" if normalize else "Количество")
+                    )
                     st.plotly_chart(fig_hist, use_container_width=True, key=unique_key)
-                    
+
             elif config["chart_type"] == "Скатерплот":
                 x_col = config["scatter"]["x"]
                 y_col = config["scatter"]["y"]
@@ -211,7 +265,7 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                 for g in config["selected_groups"]:
                     df_g = (global_filtered_data if g == "Глобальный" else group_configs[g]["filtered_data"]).copy()
                     if x_col in df_g.columns and y_col in df_g.columns:
-                        df_plot = df_g[[x_col, y_col]].copy()
+                        df_plot = df_g[[x_col, y_col, "project", "developer"]].copy()
                         if normalize_scatter:
                             if df_plot[x_col].nunique() > 1:
                                 df_plot[x_col] = df_plot[x_col].rank(pct=True)
@@ -224,8 +278,22 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                 else:
                     color_list = [("#FF0000" if g == "Глобальный" else group_configs[g]["vis"]["color"]) for g in config["selected_groups"]]
                     fig_scatter = build_scatter(chart_data, x_col, y_col, config["selected_groups"], color_list, height=400)
+                    fig_scatter.update_layout(
+                        xaxis_title=rus_columns.get(x_col, x_col),
+                        yaxis_title=rus_columns.get(y_col, y_col)
+                    )
+
+                    for trace in fig_scatter.data:
+                        grp = trace.name
+                        df_grp = chart_data[chart_data["group"] == grp]
+                        trace.customdata = df_grp[["project", "developer"]].values
+                        trace.hovertemplate = (
+                            "Проект: %{customdata[0]}<br>"
+                            "Застройщик: %{customdata[1]}<br>"
+                            + trace.hovertemplate
+                        )
                     st.plotly_chart(fig_scatter, use_container_width=True, key=unique_key)
-                    
+
             elif config["chart_type"] == "Кривая выбытия":
                 depletion_curve_path = f"data/regions/{city_key}/market_deals/cache/depletion_curves.feather"
                 fig_dep = build_depletion_chart(
@@ -240,13 +308,15 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                     st.info("Нет данных для построения кривой выбытия.")
                 else:
                     st.plotly_chart(fig_dep, use_container_width=True, key=unique_key)
-                    
+
             elif config["chart_type"] == "Кривая эластичности":
                 fig_el = build_elasticity_chart(
                     selected_groups=config["selected_groups"],
                     global_filtered_data=global_filtered_data,
                     group_configs=group_configs,
-                    split_parameter=config["elasticity"]["split"]
+                    split_parameter=config["elasticity"]["split"],
+                    min_seg=config["elasticity"]["min_seg"],
+                    max_seg=config["elasticity"]["max_seg"]
                 )
                 if fig_el is None:
                     st.info("Нет данных для построения кривой эластичности.")
