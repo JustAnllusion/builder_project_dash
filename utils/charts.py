@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
 from utils.utils import find_segment_for_elasticity
+from scipy.optimize import curve_fit
 
 from utils.utils import (
     compute_avg_depletion_curve,
@@ -210,7 +211,6 @@ def build_elasticity_chart(selected_groups, global_filtered_data, group_configs,
         return None
 
     precomputed = precomputed[precomputed["split_parameter"] == split_parameter]
-    # Фильтрация по диапазону сегментов area_seg
     if min_seg is not None and max_seg is not None:
         precomputed = precomputed[
             (precomputed["area_seg"] >= min_seg) &
@@ -252,22 +252,26 @@ def build_elasticity_chart(selected_groups, global_filtered_data, group_configs,
         aligned = [c.reindex(all_idx, method="ffill") for c in list_of_curves]
         avg_curve = pd.concat(aligned, axis=1).mean(axis=1)
 
-        list_of_hyper = [
-            sub_df.set_index("area_seg")["hyper_curve"]
-            for _, sub_df in df_group.groupby("house_id")
-        ]
-        avg_hyper = pd.concat(
-            [s.reindex(all_idx, method="ffill") for s in list_of_hyper],
-            axis=1
-        ).mean(axis=1)
         if min_seg not in avg_curve.index:
             min_seg_eff = all_idx[0]
         else:
             min_seg_eff = min_seg
         base_norm = avg_curve.loc[min_seg_eff]
-        base_hyper = avg_hyper.loc[min_seg_eff]
         new_norm = avg_curve / base_norm
-        new_hyper = avg_hyper / base_hyper
+
+        def hyper_func(x, a, b):
+
+            return a + b / x
+
+        x_data = np.asarray(all_idx, dtype=float)
+        y_data = new_norm.values
+
+        try:
+            popt, _ = curve_fit(hyper_func, x_data, y_data, p0=[0, 1], maxfev=10000)
+            fitted_hyper = hyper_func(x_data, *popt)
+        except Exception:
+            # fall‑back: pure 1/x through the first point
+            fitted_hyper = hyper_func(x_data, 0, y_data[0] * x_data[0])
 
         fig.add_trace(
             go.Scatter(
@@ -283,9 +287,9 @@ def build_elasticity_chart(selected_groups, global_filtered_data, group_configs,
         fig.add_trace(
             go.Scatter(
                 x=all_idx,
-                y=new_hyper.values,
+                y=fitted_hyper,
                 mode="lines",
-                name=f"{group} гиперб. оценка",
+                name=f"{group} гиперб.оценка",
                 line=dict(color=color_map[group], dash="dash"),
             ),
             secondary_y=False

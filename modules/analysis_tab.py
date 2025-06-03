@@ -180,14 +180,16 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                 elif config["chart_type"] == "Кривая эластичности":
                     st.markdown("**Настройки кривой эластичности**", unsafe_allow_html=True)
                     split_options = list(range(1, 6))
-                    default_split = int(config["elasticity"].get("split", 1))
-                    config["elasticity"]["split"] = st.selectbox(
-                        "Шаг сегментации (кв.м.)",
-                        options=split_options,
-                        index=split_options.index(default_split),
-                        key=f"elasticity_split_{config['id']}"
-                    )
-
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        default_split = int(config["elasticity"].get("split", 1))
+                        config["elasticity"]["split"] = st.selectbox(
+                            "Шаг сегментации (кв.м.)",
+                            options=split_options,
+                            index=split_options.index(default_split),
+                            key=f"elasticity_split_{config['id']}"
+                        )
+                    # Precompute valid min/max based on pre_df
                     precomputed_path = f"data/regions/{st.session_state.get('city_key','msk')}/market_deals/cache/elasticity_curves.feather"
                     try:
                         pre_df = pd.read_feather(precomputed_path)
@@ -196,25 +198,22 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                         seg_max = int(pre_df["area_seg"].max())
                     except:
                         seg_min, seg_max = 0, 0
-
                     default_min = config["elasticity"].get("min_seg", seg_min)
                     default_max = config["elasticity"].get("max_seg", seg_max)
                     default_min = max(default_min, seg_min)
                     default_max = min(default_max, seg_max)
-
-                    col_min, col_max = st.columns(2)
-                    with col_min:
+                    with col2:
                         config["elasticity"]["min_seg"] = st.number_input(
-                            "Мин. сегмент",
+                            "Мин. площадь",
                             min_value=seg_min,
                             max_value=seg_max,
                             value=default_min,
                             step=1,
                             key=f"elasticity_min_seg_{config['id']}"
                         )
-                    with col_max:
+                    with col3:
                         config["elasticity"]["max_seg"] = st.number_input(
-                            "Макс. сегмент",
+                            "Макс. площадь",
                             min_value=seg_min,
                             max_value=seg_max,
                             value=default_max,
