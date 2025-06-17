@@ -57,9 +57,9 @@ def download_ui(df: pd.DataFrame, default_file_name: str):
 
 
 @st.cache_data(show_spinner=False)
-def load_depletion_curves(file_path="depletion_curves.feather"):
+def load_depletion_curves(file_path="depletion_curves.parquet"):
     try:
-        return pd.read_feather(file_path)
+        return pd.read_parquet(file_path)
     except Exception as e:
         st.error(f"Ошибка загрузки кривых выбытия: {e}")
         return pd.DataFrame()

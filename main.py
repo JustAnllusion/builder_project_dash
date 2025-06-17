@@ -39,15 +39,15 @@ if authentication_status:
     st.title(f"Анализ данных для {selected_city}")
 
     city_mapping = {
-        "Москва": "msk",
+        "Москва": "msk_united",
         "Екатеринбург": "ekb",
         "Новосибирск": "nsk",
         "Челябинск": "chb"
     }
 
-    if selected_city not in city_mapping or city_mapping[selected_city] not in ["msk", "ekb"]:
+    if selected_city not in city_mapping or city_mapping[selected_city] not in ["msk_united", "ekb"]:
         st.info("Данные для выбранного города пока не доступны, используются данные Москвы.")
-        city_key = "msk"
+        city_key = city_mapping["Москва"]
         selected_city = "Москва"
     else:
         city_key = city_mapping[selected_city]
@@ -60,7 +60,9 @@ if authentication_status:
             st.session_state.active_city = selected_city
             st.session_state.data_loaded = True
         house_data = st.session_state.house_data
-        apartment_data = st.session_state.apartment_data
+
+
+    apartment_data = st.session_state.apartment_data
 
     tabs = ["Данные", "Карта объектов", "Анализ", "Кластеризация"]
 
@@ -84,7 +86,7 @@ if authentication_status:
     elif active_tab == "Предсказание":
         render_prediction_tab()
     elif active_tab == "Кластеризация":
-        render_clustering_tab(st.session_state.apartment_data,group_configs,city_key)
+        render_clustering_tab(apartment_data, group_configs, city_key)
 
 else:
     st.warning("Пожалуйста, введите имя пользователя и пароль")

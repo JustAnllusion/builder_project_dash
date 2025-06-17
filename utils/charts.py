@@ -4,7 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
-from utils.utils import find_segment_for_elasticity
+from utils.utils import find_segment_for_elasticity, fit_hyperbolic_alpha
 from scipy.optimize import curve_fit
 
 from utils.utils import (
@@ -107,6 +107,7 @@ def build_scatter(chart_data, x_col, y_col, color_domain, color_range, height=40
 #         height=height, xaxis_title="Время (дни)", yaxis_title="Остаток продаж (%)"
 #     )
 #     return fig
+
 def build_depletion_chart(
         depletion_curves_file,
         selected_groups,
@@ -156,7 +157,6 @@ def build_depletion_chart(
         for group in selected_groups
     }
 
-    # Основные (средние) кривые
     for group in combined_data["group"].unique():
         df = combined_data[combined_data["group"] == group]
         fig.add_trace(go.Scatter(
@@ -169,7 +169,6 @@ def build_depletion_chart(
             showlegend=True,
         ))
 
-    # Индивидуальные кривые
     if show_individual and not individual_data.empty:
         max_individual = 100
         for group in individual_data["group"].unique():
@@ -202,10 +201,11 @@ def build_depletion_chart(
 
 
 def build_elasticity_chart(selected_groups, global_filtered_data, group_configs, split_parameter, min_seg=None, max_seg=None):
-    city_key = st.session_state.get("city_key", "msk")
-    precomputed_path = f"data/regions/{city_key}/market_deals/cache/elasticity_curves.feather"
+    city_key = st.session_state.get("city_key", "msk_united")
+    precomputed_path = f"data/regions/{city_key}/cache/elasticity_curves.parquet"
+
     try:
-        precomputed = pd.read_feather(precomputed_path)
+        precomputed = pd.read_parquet(precomputed_path)
     except Exception as e:
         print(f"Ошибка загрузки предвычисленных данных: {e}")
         return None
@@ -235,7 +235,9 @@ def build_elasticity_chart(selected_groups, global_filtered_data, group_configs,
             continue
 
         try:
-            deals_count = df_group.groupby("area_seg").size()
+                deals_count = df_group.groupby("area_seg").size()
+                total_deals = deals_count.sum()
+                deals_values = (deals_count.values / total_deals) if total_deals > 0 else deals_count.values
         except Exception as e:
             print(f"Ошибка группировки по area_seg: {e}")
             continue
@@ -259,19 +261,23 @@ def build_elasticity_chart(selected_groups, global_filtered_data, group_configs,
         base_norm = avg_curve.loc[min_seg_eff]
         new_norm = avg_curve / base_norm
 
-        def hyper_func(x, a, b):
+        # def hyper_func(x, a, b, c):
+        #     return a + b / (x ** c)
+        #
+        # x_data = np.asarray(all_idx, dtype=float)
+        # y_data = new_norm.values
+        #
+        # try:
+        #     popt, _ = curve_fit(hyper_func, x_data, y_data, p0=[0, 1, 1], maxfev=10000)
+        #     a, b, c = popt
+        #     b = (1 - a) * (x_data[0] ** c)
+        #     fitted_hyper = hyper_func(x_data, a, b, c)
+        # except Exception:
+        #     fitted_hyper = hyper_func(x_data, 0, y_data[0] * (x_data[0] ** 1), 1)
 
-            return a + b / x
-
+        alpha = fit_hyperbolic_alpha(new_norm)
         x_data = np.asarray(all_idx, dtype=float)
-        y_data = new_norm.values
-
-        try:
-            popt, _ = curve_fit(hyper_func, x_data, y_data, p0=[0, 1], maxfev=10000)
-            fitted_hyper = hyper_func(x_data, *popt)
-        except Exception:
-            # fall‑back: pure 1/x through the first point
-            fitted_hyper = hyper_func(x_data, 0, y_data[0] * x_data[0])
+        fitted_hyper = (x_data[0] ** alpha) / (x_data ** alpha)
 
         fig.add_trace(
             go.Scatter(
@@ -299,7 +305,7 @@ def build_elasticity_chart(selected_groups, global_filtered_data, group_configs,
         fig.add_trace(
             go.Bar(
                 x=x_vals,
-                y=deals_count.values,
+                y=deals_values,
                 name=f"{group} сделки",
                 marker_color=color_map[group],
                 opacity=0.4,
@@ -308,7 +314,7 @@ def build_elasticity_chart(selected_groups, global_filtered_data, group_configs,
         )
 
     fig.update_layout(
-        height=500,
+        height=400,
         title=f"Кривая эластичности (шаг сегментации = {split_parameter} кв.м)",
         showlegend=True,
         barmode='overlay'
@@ -318,4 +324,60 @@ def build_elasticity_chart(selected_groups, global_filtered_data, group_configs,
     fig.update_yaxes(title_text="Нормированная цена", secondary_y=False)
     fig.update_yaxes(title_text="Число сделок", secondary_y=True)
 
+    return fig
+
+def build_floor_elasticity_chart(selected_groups, global_filtered_data, group_configs):
+    """
+    Строит среднюю кривую эластичности цены по этажам для выбранных групп домов.
+    """
+    city_key = st.session_state.get("city_key", "msk_united")
+    path = f"data/regions/{city_key}/cache/floor_elasticity.parquet"
+    try:
+        df = pd.read_parquet(path)
+    except Exception as e:
+        st.error(f"Ошибка загрузки данных эластичности по этажам: {e}")
+        return None
+
+    from plotly.subplots import make_subplots
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    color_map = {
+        group: "#FF0000" if group == "Глобальный" else group_configs[group]["vis"]["color"]
+        for group in selected_groups
+    }
+    for group in selected_groups:
+        if group == "Глобальный":
+            house_ids = global_filtered_data["house_id"].unique()
+        else:
+            house_ids = group_configs[group]["filtered_data"]["house_id"].unique()
+
+        df_group = df[df["house_id"].isin(house_ids)]
+        if df_group.empty:
+            continue
+
+
+        df_mean = (
+            df_group
+            .groupby("from_floor", as_index=False)["elasticity"]
+            .mean()
+            .sort_values("from_floor")
+        )
+
+        fig.add_trace(go.Scatter(
+            x=df_mean["from_floor"],
+            y=df_mean["elasticity"],
+            mode="lines+markers",
+            name=group,
+            line=dict(color=color_map[group]),
+            marker=dict(color=color_map[group])
+        ), secondary_y=False)
+
+    fig.update_layout(
+        height=400,
+        title="Кривая эластичности (этаж)",
+        showlegend=True,
+        barmode="overlay"
+    )
+    fig.update_xaxes(title_text="Этаж")
+    fig.update_yaxes(title_text="Нормированная цена", secondary_y=False)
+    fig.update_yaxes(title_text="Количество объектов", secondary_y=True)
     return fig

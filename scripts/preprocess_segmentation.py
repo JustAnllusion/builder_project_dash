@@ -308,11 +308,11 @@ def intersection_point(a1, b1, c1, a2, b2, c2):
   return [x, y]
 
 def make_new_clusterisation(msk_prep,house_ids,n_cl = 7):
-  data = msk_prep[['total_price_discounted','contract_date','discounting_price','builder','house_id','area']].copy()
+  data = msk_prep[['total_price_discounted','contract_date','price_disc','builder_old','house_id_old','area']].copy()
 
-  quantile_value_sq = data['discounting_price'].quantile(0.99)
+  quantile_value_sq = data['price_disc'].quantile(0.99)
   quantile_value_total = data['total_price_discounted'].quantile(0.99)
-  data = data[(data['discounting_price'] <= quantile_value_sq) & 
+  data = data[(data['price_disc'] <= quantile_value_sq) &
               (data['total_price_discounted'] <= quantile_value_total)].copy()
 
   data['contract_date'] = pd.to_datetime(data['contract_date'])
@@ -320,7 +320,7 @@ def make_new_clusterisation(msk_prep,house_ids,n_cl = 7):
   data['time_segment'] = pd.cut(data['contract_date'], bins=date_ranges, labels=False, include_lowest=True)
 
   scaler = StandardScaler()
-  data_cl = data[['total_price_discounted', 'discounting_price']].copy()
+  data_cl = data[['total_price_discounted', 'price_disc']].copy()
   data_cl_scaled = scaler.fit_transform(data_cl)
 
   kmeans = KMeans(n_clusters=n_cl, random_state=1,n_init=10)
@@ -330,12 +330,12 @@ def make_new_clusterisation(msk_prep,house_ids,n_cl = 7):
   for segment in range(1):
       segment_data = data[data['time_segment'] == segment]
       if not segment_data.empty:
-          segment_scaled = scaler.transform(segment_data[['total_price_discounted', 'discounting_price']])
+          segment_scaled = scaler.transform(segment_data[['total_price_discounted', 'price_disc']])
           kmeans.fit(segment_scaled)
           segment_labels = kmeans.predict(segment_scaled)
           data.loc[data['time_segment'] == segment, 'KMeans'] = segment_labels
           segment_data = segment_data.sort_values(by='KMeans')
-          segment_data_scaled_ = scaler.transform(segment_data[['total_price_discounted', 'discounting_price']])
+          segment_data_scaled_ = scaler.transform(segment_data[['total_price_discounted', 'price_disc']])
           segment_data['total_price_discounted_scaled'] = segment_data_scaled_[:,0]
           segment_data['discounting_price_scaled'] = segment_data_scaled_[:,1]
 
@@ -343,7 +343,7 @@ def make_new_clusterisation(msk_prep,house_ids,n_cl = 7):
   means = scaler.mean_[::-1]
   scales = scaler.scale_[::-1]
 
-  points = segment_data[['discounting_price','total_price_discounted']].to_numpy()
+  points = segment_data[['price_disc','total_price_discounted']].to_numpy()
 
   quantile = 0.0001
   quantile2 = 0.00001
@@ -397,10 +397,10 @@ def make_new_clusterisation(msk_prep,house_ids,n_cl = 7):
   return fig
 
 if __name__ == "__main__":
-    cities = ["msk", "ekb"] 
+    cities = ["msk_united", "ekb"]
 
     cluster_mapping = {
-        "msk": 7,
+        "msk_united": 7,
         "ekb": 3,
         "nsk": 3,
         "chb": 3
@@ -410,19 +410,18 @@ if __name__ == "__main__":
         input_dir = os.path.join("data", "regions", city, "market_deals")
         output_dir = os.path.join("data", "regions", city, "segmentation")
         os.makedirs(output_dir, exist_ok=True)
-        apartment_path = os.path.join(input_dir, f"{city}_prep.feather")
+        apartment_path = os.path.join(input_dir, f"{city}_geo_preprocessed_market_deals.parquet")
         try:
-            apartment_data = pd.read_feather(apartment_path)
-            # house_data = pd.read_feather(house_path)
+            apartment_data = pd.read_parquet(apartment_path)
         except Exception as e:
             print(f"Ошибка загрузки данных для города {city}: {e}")
             continue
         
 
-        ir = get_interest_rate(apartment_data, is_ml=False)
-        apartment_data["discounting_price"] = discounting(apartment_data, ir)
-        apartment_data["discounting_price"] = apartment_data["discounting_price"] * ir.iloc[-1]
-        apartment_data['total_price_discounted'] = apartment_data['area'] * apartment_data['discounting_price']
+        # ir = get_interest_rate(apartment_data, is_ml=False)
+        # apartment_data["discounting_price"] = discounting(apartment_data, ir)
+        # apartment_data["discounting_price"] = apartment_data["discounting_price"] * ir.iloc[-1]
+        apartment_data['total_price_discounted'] = apartment_data['area'] * apartment_data['price_disc']
 
         output_path = os.path.join(output_dir,f'{city}_fig_clusterisation.pkl')
         with open(output_path, 'wb') as f:

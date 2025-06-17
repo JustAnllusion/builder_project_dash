@@ -4,15 +4,21 @@ import pandas as pd
 def precompute_depletion_curves(apartment_data, house_data, convert_to_days=True, align_time_zero=True):
     curves = []
     apartment_data["contract_date"] = pd.to_datetime(apartment_data["contract_date"], errors="coerce")
-    sales_by_house = apartment_data.groupby("house_id")
+    sales_by_house = apartment_data.groupby("house_id_old")
+    s = 0
     for _, house in house_data.iterrows():
         house_id = house["house_id"]
+
         ndeals = house.get("ndeals", None)
+        # print(ndeals)
         if ndeals is None or ndeals <= 0:
             continue
+
         try:
             house_sales = sales_by_house.get_group(house_id).copy()
+
         except KeyError:
+
             house_sales = pd.DataFrame()
         if house_sales.empty:
             if convert_to_days:
@@ -51,20 +57,21 @@ def precompute_depletion_curves(apartment_data, house_data, convert_to_days=True
     return pd.concat(curves, ignore_index=True) if curves else pd.DataFrame()
 
 if __name__ == "__main__":
-    cities = ["msk", "ekb"] 
+    cities = ["msk_united", "ekb"]
     for city in cities:
-        input_dir = os.path.join("data", "regions", city, "market_deals")
-        output_dir = os.path.join("data", "regions", city, "market_deals", "cache")
+        market_deals_dir = os.path.join("data", "regions", city, "market_deals")
+        houses_info_dir = os.path.join("data", "regions", city, "houses_info")
+        output_dir = os.path.join("data", "regions", city, "cache")
         os.makedirs(output_dir, exist_ok=True)
-        apartment_path = os.path.join(input_dir, f"{city}_prep.feather")
-        house_path = os.path.join(input_dir, f"{city}_apartment.feather")
+        apartment_path = os.path.join(market_deals_dir, f"{city}_geo_preprocessed_market_deals.parquet")
+        house_path = os.path.join(houses_info_dir, f"{city}_houses.parquet")
         try:
-            apartment_data = pd.read_feather(apartment_path)
-            house_data = pd.read_feather(house_path)
+            apartment_data = pd.read_parquet(apartment_path)
+            house_data = pd.read_parquet(house_path)
         except Exception as e:
             print(f"Ошибка загрузки данных для города {city}: {e}")
             continue
         depletion_curves = precompute_depletion_curves(apartment_data, house_data, convert_to_days=True, align_time_zero=True)
-        output_path = os.path.join(output_dir, "depletion_curves.feather")
-        depletion_curves.to_feather(output_path)
+        output_path = os.path.join(output_dir, "depletion_curves.parquet")
+        depletion_curves.to_parquet(output_path)
         print(f"Кривые выбытия сохранены для города {city} в: {output_path}")

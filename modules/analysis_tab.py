@@ -6,6 +6,7 @@ from utils.charts import (
     build_elasticity_chart,
     build_histogram,
     build_scatter,
+    build_floor_elasticity_chart
 )
 from components.widgets import safe_multiselect
 from utils.translations import rus_columns
@@ -22,7 +23,7 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
         """,
         unsafe_allow_html=True
     )
-    city_key = st.session_state.get("city_key", "msk")
+    city_key = st.session_state.get("city_key", "msk_united")
 
     if "chart_counter" not in st.session_state:
         st.session_state.chart_counter = 0
@@ -34,7 +35,7 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
         default_config = {
             "id": default_id,
             "name": f"График {default_id}",
-            "chart_type": "Кривая эластичности",
+            "chart_type": "Кривая эластичности (площадь)",
             "selected_groups": ["Глобальный"] + (list(group_configs.keys()) if group_configs else []),
             "histogram": {
                 "column": "mean_price",
@@ -64,7 +65,7 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                     "Название графика", value=config["name"], key=f"chart_name_{config['id']}"
                 )
             with colB:
-                chart_options = ["Гистограмма", "Скатерплот", "Кривая выбытия", "Кривая эластичности"]
+                chart_options = ["Гистограмма", "Скатерплот", "Кривая выбытия", "Кривая эластичности (площадь)", "Кривая эластичности (этаж)"]
 
                 selected_chart_type = st.selectbox(
                     "Тип графика",
@@ -177,7 +178,7 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                         key=f"depletion_individual_{config['id']}"
                     )
 
-                elif config["chart_type"] == "Кривая эластичности":
+                elif config["chart_type"] == "Кривая эластичности (площадь)":
                     st.markdown("**Настройки кривой эластичности**", unsafe_allow_html=True)
                     split_options = list(range(1, 6))
                     col1, col2, col3 = st.columns(3)
@@ -189,10 +190,10 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                             index=split_options.index(default_split),
                             key=f"elasticity_split_{config['id']}"
                         )
-                    # Precompute valid min/max based on pre_df
-                    precomputed_path = f"data/regions/{st.session_state.get('city_key','msk')}/market_deals/cache/elasticity_curves.feather"
+
+                    precomputed_path =f"data/regions/{st.session_state.get('city_key','msk_united')}/cache/elasticity_curves.parquet"
                     try:
-                        pre_df = pd.read_feather(precomputed_path)
+                        pre_df = pd.read_parquet(precomputed_path)
                         pre_df = pre_df[pre_df["split_parameter"] == config["elasticity"]["split"]]
                         seg_min = int(pre_df["area_seg"].min())
                         seg_max = int(pre_df["area_seg"].max())
@@ -294,7 +295,7 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                     st.plotly_chart(fig_scatter, use_container_width=True, key=unique_key)
 
             elif config["chart_type"] == "Кривая выбытия":
-                depletion_curve_path = f"data/regions/{city_key}/market_deals/cache/depletion_curves.feather"
+                depletion_curve_path = f"data/regions/{city_key}/cache/depletion_curves.parquet"
                 fig_dep = build_depletion_chart(
                     depletion_curve_path,
                     config["selected_groups"],
@@ -308,7 +309,7 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                 else:
                     st.plotly_chart(fig_dep, use_container_width=True, key=unique_key)
 
-            elif config["chart_type"] == "Кривая эластичности":
+            elif config["chart_type"] == "Кривая эластичности (площадь)":
                 fig_el = build_elasticity_chart(
                     selected_groups=config["selected_groups"],
                     global_filtered_data=global_filtered_data,
@@ -321,6 +322,17 @@ def render_analysis_tab(global_filtered_data: pd.DataFrame, house_data: pd.DataF
                     st.info("Нет данных для построения кривой эластичности.")
                 else:
                     st.plotly_chart(fig_el, use_container_width=True, key=unique_key)
+
+            elif config["chart_type"] == "Кривая эластичности (этаж)":
+                fig_floor = build_floor_elasticity_chart(
+                    selected_groups=config["selected_groups"],
+                    global_filtered_data=global_filtered_data,
+                    group_configs=group_configs
+                )
+                if fig_floor is None:
+                    st.info("Нет данных для построения графика эластичности по этажам.")
+                else:
+                    st.plotly_chart(fig_floor, use_container_width=True, key=unique_key)
                     
             if st.button(f"Удалить график «{config['name']}»", key=f"delete_chart_{config['id']}_btn"):
                 st.session_state.graph_configs = [cfg for cfg in st.session_state.graph_configs if cfg["id"] != config["id"]]

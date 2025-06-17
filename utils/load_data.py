@@ -8,12 +8,12 @@ LOCAL_DATA_DIR = "data/regions"
 
 @st.cache_data
 def _load_file_from_local_cache(local_path: str) -> pd.DataFrame:
-    return pd.read_feather(local_path)
+    return pd.read_parquet(local_path)
 
-def load_data(city: str, filename: str) -> pd.DataFrame:
+def load_data(city: str, filename: str, subfolder: str) -> pd.DataFrame:
 
-    remote_url = f"{BASE_URL}/{city}/market_deals/{filename}"
-    local_path = os.path.join(LOCAL_DATA_DIR, city, "market_deals", filename)
+    remote_url = f"{BASE_URL}/{city}/{subfolder}/{filename}"
+    local_path = os.path.join(LOCAL_DATA_DIR, city, subfolder, filename)
     etag_path = local_path + ".etag"
 
     try:
@@ -53,15 +53,14 @@ def load_data(city: str, filename: str) -> pd.DataFrame:
     return _load_file_from_local_cache(local_path)
 
 def load_city_data(city: str) -> dict:
- 
     city_files = {
-        "apartment_data": f"{city}_prep.feather",
-        "house_data": f"{city}_apartment.feather"
+        "apartment_data": ("market_deals", f"{city}_geo_preprocessed_market_deals.parquet"),
+        "house_data":    ("houses_info",    f"{city}_houses.parquet")
     }
 
     results = {}
-    for key, filename in city_files.items():
-        df = load_data(city, filename)
+    for key, (subfolder, filename) in city_files.items():
+        df = load_data(city, filename, subfolder)
         results[key] = df
 
     return results

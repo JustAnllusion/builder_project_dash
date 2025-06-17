@@ -5,11 +5,14 @@ import pandas as pd
 import os
 
 def render_clustering_tab(apartment_data: pd.DataFrame,group_configs: dict,city_key: str):
+    
+    apartment_data = apartment_data.copy()
+    apartment_data[['house_id']] = apartment_data[['house_id_old']]
     # house_data_cluster = apartment_data.copy()  #(
-    ir = figures.get_interest_rate(apartment_data, is_ml=False)
-    apartment_data["discounting_price"] = figures.discounting(apartment_data, ir)
-    apartment_data["discounting_price"] = apartment_data["discounting_price"] * ir.iloc[-1]
-    apartment_data['total_price_discounted'] = apartment_data['area'] * apartment_data['discounting_price']
+    # ir = figures.get_interest_rate(apartment_data, is_ml=False)
+    # apartment_data["price_disc"] = figures.discounting(apartment_data, ir)
+    # apartment_data["price_disc"] = apartment_data["price_disc"] * ir.iloc[-1]
+    apartment_data['total_price_discounted'] = apartment_data['area'] * apartment_data['price_disc']
 
     # with open('fig_clusterisation.pkl', 'wb') as f:
     #      pickle.dump(figures.make_new_clusterisation(apartment_data,[]),f)
@@ -29,7 +32,7 @@ def render_clustering_tab(apartment_data: pd.DataFrame,group_configs: dict,city_
     st.markdown(
         "<div class='section-header'>Сегментация</div>", unsafe_allow_html=True
     )
-    required_cols = {"house_id", "total_price_discounted", "discounting_price", "start_sales"}
+    required_cols = {"house_id", "total_price_discounted", "price_disc", "start_sales"}
     if not required_cols.issubset(apartment_data.columns):
         
         st.warning(f"Для корректной работы необходимы столбцы: {', '.join(required_cols)}")

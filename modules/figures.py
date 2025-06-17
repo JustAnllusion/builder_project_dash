@@ -176,7 +176,7 @@ def add_points_to_voronoi(fig, data, house_ids, group_configs=None):
         
         if not group_data.empty:
             fig.add_trace(go.Scattergl(
-                x=group_data["discounting_price"], 
+                x=group_data["price_disc"], 
                 y=group_data["total_price_discounted"],
                 mode='markers',
                 marker=dict(

@@ -14,7 +14,7 @@ import logging
 BASE_URL = "https://storage.yandexcloud.net/scienceforbusiness/data/regions"
 LOCAL_DATA_DIR = "data/regions"
 CITY_FILES = {
-    "apartment_data": "{city}_prep.feather",
+    # "apartment_data": "{city}_prep.feather",
     "house_data": "{city}_apartment.feather",
 }
 
