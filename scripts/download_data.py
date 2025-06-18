@@ -14,8 +14,8 @@ import logging
 BASE_URL = "https://storage.yandexcloud.net/scienceforbusiness/data/regions"
 LOCAL_DATA_DIR = "data/regions"
 CITY_FILES = {
-    # "apartment_data": "{city}_prep.feather",
-    "house_data": "{city}_apartment.feather",
+    "apartment_data": ("market_deals", "{city}_geo_preprocessed_market_deals.parquet"),
+    "house_data":    ("houses_info",    "{city}_houses.parquet"),
 }
 
 logging.basicConfig(
@@ -27,10 +27,10 @@ logging.basicConfig(
 
 def download_for_city(city: str):
 
-    for key, template in CITY_FILES.items():
+    for key, (subfolder, template) in CITY_FILES.items():
         filename = template.format(city=city)
-        remote_url = f"{BASE_URL}/{city}/market_deals/{filename}"
-        local_path = os.path.join(LOCAL_DATA_DIR, city, "market_deals", filename)
+        remote_url = f"{BASE_URL}/{city}/{subfolder}/{filename}"
+        local_path = os.path.join(LOCAL_DATA_DIR, city, subfolder, filename)
         etag_path = local_path + ".etag"
 
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
