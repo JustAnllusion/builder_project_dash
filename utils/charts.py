@@ -328,23 +328,39 @@ def build_elasticity_chart(selected_groups, global_filtered_data, group_configs,
 
 def build_floor_elasticity_chart(selected_groups, global_filtered_data, group_configs):
     """
-    Строит среднюю кривую эластичности цены по этажам для выбранных групп домов.
+    Строит накопленную кривую эластичности цены по этажам для выбранных групп домов,
+    включая линии тренда вверх и вниз от базового этажа.
     """
-    city_key = st.session_state.get("city_key", "msk_united")
+    import numpy as np
+    import pandas as pd
+    from scipy.optimize import minimize
+    import plotly.graph_objects as go
+    from streamlit import session_state
+
+    # параметры графика
+    floor_min = 1
+    floor_max = 14
+    floor_start = 3
+
+    # читаем city_key из сессии
+    city_key = session_state.get("city_key", "msk_united")
+
+    if city_key is None:
+        return None
+
+    # путь к предвычисленным данным
     path = f"data/regions/{city_key}/cache/floor_elasticity.parquet"
     try:
         df = pd.read_parquet(path)
     except Exception as e:
+        import streamlit as st
         st.error(f"Ошибка загрузки данных эластичности по этажам: {e}")
         return None
 
-    from plotly.subplots import make_subplots
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-    color_map = {
-        group: "#FF0000" if group == "Глобальный" else group_configs[group]["vis"]["color"]
-        for group in selected_groups
-    }
+    fig = go.Figure()
+
     for group in selected_groups:
+        # выбираем ID домов для группы
         if group == "Глобальный":
             house_ids = global_filtered_data["house_id"].unique()
         else:
@@ -354,30 +370,63 @@ def build_floor_elasticity_chart(selected_groups, global_filtered_data, group_co
         if df_group.empty:
             continue
 
-
+        # усредненная эластичность для каждой пары этажей
         df_mean = (
             df_group
             .groupby("from_floor", as_index=False)["elasticity"]
             .mean()
             .sort_values("from_floor")
         )
+        temp_list = df_mean["elasticity"].tolist()
+
+        # кумулятивный рост вверх
+        up_list = np.cumprod([1.0] + temp_list[floor_start-1:floor_max-1]).tolist()
+
+        # кумулятивный рост вниз
+        down_base = temp_list[floor_min-1:floor_start-1]
+        if down_base:
+            down_base[-1] = 1.0 / down_base[-1]
+            down_list = [
+                down_base[i+1] / down_base[i]
+                for i in range(len(down_base)-2, -1, -1)
+            ] + [down_base[-1]]
+        else:
+            down_list = []
+
+        x = list(range(floor_min, floor_max + 1))
+        y = down_list + up_list
+        if len(x) != len(y):
+            raise ValueError(f"Axis length mismatch: len(x)={len(x)}, len(y)={len(y)}")
+
+        def loss_up(params):
+            deg, scale = params
+            return sum(
+                (scale * (x[i] - floor_start)**deg + 1.0 - y[i])**2
+                for i in range(floor_start-1, len(x))
+            )
+
+        def loss_down(scale):
+            return sum(
+                (scale * (floor_start - x[i]) + 1.0 - y[i])**2
+                for i in range(floor_min-1, min(floor_start, len(x)))
+            )
+
+        alpha_up = minimize(loss_up, x0=np.array([0.0, 1.0])).x
+        alpha_down = minimize(loss_down, x0=np.array([0.5])).x
 
         fig.add_trace(go.Scatter(
-            x=df_mean["from_floor"],
-            y=df_mean["elasticity"],
-            mode="lines+markers",
-            name=group,
-            line=dict(color=color_map[group]),
-            marker=dict(color=color_map[group])
-        ), secondary_y=False)
+            x=x, y=y, mode="lines+markers", name=group
+        ))
+
+    
+
 
     fig.update_layout(
         height=400,
-        title="Кривая эластичности (этаж)",
-        showlegend=True,
-        barmode="overlay"
+        title="Кривая эластичности по этажам",
+        xaxis_title="Этаж",
+        yaxis_title="Накопленный коэффициент эластичности",
+        showlegend=True
     )
-    fig.update_xaxes(title_text="Этаж")
-    fig.update_yaxes(title_text="Нормированная цена", secondary_y=False)
-    fig.update_yaxes(title_text="Количество объектов", secondary_y=True)
+
     return fig

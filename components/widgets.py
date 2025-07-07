@@ -13,22 +13,18 @@ def get_unique_widget_key(prefix="widget"):
 
 
 def numeric_filter_widget(col, data, key_prefix):
-    # Обработка пустых данных
     if data.empty:
         return (0.0, 0.0)
 
-    # Границы исходных значений
     min_val = float(data.min())
     max_val = float(data.max())
 
-    # Выбор метода фильтрации
     use_quantile = st.checkbox(
         f"Фильтровать по квантилям для «{col}»",
         key=f"{key_prefix}_{col}_quant"
     )
 
     if use_quantile:
-        # Поля ввода для квантилей (0–1)
         col_qmin, col_qmax = st.columns(2)
         with col_qmin:
             q_low = st.number_input(
@@ -53,7 +49,6 @@ def numeric_filter_widget(col, data, key_prefix):
         low = float(data.quantile(q_low))
         high = float(data.quantile(q_high))
     else:
-        # Поля ввода для точной установки значений
         col_min, col_max = st.columns(2)
         with col_min:
             low = st.number_input(
@@ -74,7 +69,6 @@ def numeric_filter_widget(col, data, key_prefix):
             )
             st.caption(f"Макс. для «{col}»")
 
-    # Разделитель между фильтрами
     return (low, high)
 
 

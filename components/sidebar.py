@@ -14,7 +14,7 @@ def render_sidebar(house_data: pd.DataFrame):
         st.session_state.processed_json_files = []
 
     st.sidebar.markdown("<div class='sidebar-header'>Выбор города</div>", unsafe_allow_html=True)
-    cities = ["Москва","Екатеринбург"]
+    cities = ["Москва","Екатеринбург","Новосибирск","Челябинск"]
     selected_city = st.sidebar.selectbox("Город:", cities)
     st.session_state["selected_city"] = selected_city
 
@@ -138,7 +138,6 @@ def render_sidebar(house_data: pd.DataFrame):
                         default=prev_selected_labels,
                         key=f"group_filter_columns_{idx}"
                     )
-                    # Конвертируем обратно в исходные ключи
                     selected_keys = [label_map[label] for label in new_selected_labels]
                     if selected_keys != prev_selected_keys:
                         group["selected_filter_columns"] = selected_keys

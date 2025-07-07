@@ -82,11 +82,12 @@ def house_room_filter(x: pd.DataFrame, elem: tuple) -> bool:
 def get_floor_elasticity(deals: pd.DataFrame, discounting_mode: str = 'trend'):
 
     df = deals.copy()
+    df['area'] = df['area'].round(0)
 
     df['house_id'] = df['house_id_old']
 
     dtest = [df.groupby(by=['house_id', 'rooms_number'])
-               .apply(lambda x: house_room_filter(x, FLOOR_ELASTICITY[i]), include_groups=False)
+               .apply(lambda x: house_room_filter(x, FLOOR_ELASTICITY[i]))
              for i in tqdm(range(len(FLOOR_ELASTICITY)))]
     dtest = [pd.DataFrame(dtest[i]).reset_index() for i in range(len(dtest))]
     dtest = [dtest[i][dtest[i][0]] for i in range(len(dtest))]
