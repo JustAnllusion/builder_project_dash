@@ -10,6 +10,7 @@ COPY . .
 RUN python -m scripts.download_data msk_united ekb  && \
     python -m scripts.precompute_elasticity && \
     python -m scripts.preprocess_depletion_curves && \
+    python -m scripts.precompute_floor_elasticity && \
     python -m scripts.preprocess_segmentation
 
 
