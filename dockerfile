@@ -8,7 +8,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 
-
 RUN python -m scripts.download_data msk_united ekb
 RUN python -m scripts.precompute_elasticity
 RUN python -m scripts.preprocess_depletion_curves
