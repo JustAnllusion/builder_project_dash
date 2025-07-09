@@ -10,9 +10,9 @@ COPY . .
 
 
 RUN python -m scripts.download_data msk_united ekb
-# RUN python -m scripts.precompute_elasticity
+RUN python -m scripts.precompute_elasticity
 RUN python -m scripts.preprocess_depletion_curves
-# RUN python -m scripts.precompute_floor_elasticity
+RUN python -m scripts.precompute_floor_elasticity
 RUN python -m scripts.preprocess_segmentation
 
 ENV STREAMLIT_TELEMETRY_ENABLED=false
