@@ -22,11 +22,9 @@ jobs:
 
       - name: Build and test container locally
         timeout-minutes: 90      
-        env:
-          DOCKER_BUILDKIT: 0
         run: |
-          # включаем подробный вывод сборки
-          docker build --progress=plain --no-cache -t test-streamlit .
+
+          docker buildx build --progress=plain --load --no-cache -t test-streamlit .
           docker run -d -p 8501:8501 --name test-app test-streamlit
           sleep 10
           curl --fail http://localhost:8501/_stcore/health
