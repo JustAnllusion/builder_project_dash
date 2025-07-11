@@ -7,6 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+
 RUN python -u -m scripts.download_data msk_united ekb \
  && echo "[`date`] ✅ download_data completed" \
  && python -u -m scripts.precompute_elasticity \
