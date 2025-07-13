@@ -43,6 +43,7 @@ jobs:
             set -e
             docker stop app || true
             docker rm app || true
+            docker system prune -af --volumes || true
             cd /home/${{ secrets.VM_USER }}
             rm -rf builder_project_dash || true
             git clone git@github.com:JustAnllusion/builder_project_dash.git
