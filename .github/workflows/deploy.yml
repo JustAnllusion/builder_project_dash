@@ -42,12 +42,17 @@ jobs:
           port: ${{ secrets.VM_SSH_PORT }}
           script: |
             set -e
-            export DOCKER_BUILDKIT=0
             docker stop app || true
             docker rm app || true
             cd /home/${{ secrets.VM_USER }}
             rm -rf builder_project_dash || true
             git clone git@github.com:JustAnllusion/builder_project_dash.git
             cd builder_project_dash
-            docker build --progress=plain --pull --no-cache -t streamlit-app .
+            # Use Buildx for proper progress output
+            docker buildx build \
+              --progress=plain \
+              --load \
+              --pull \
+              --no-cache \
+              -t streamlit-app .
             docker run -d --name app -p 8501:8501 streamlit-app
