@@ -358,6 +358,10 @@ def build_floor_elasticity_chart(selected_groups, global_filtered_data, group_co
         return None
 
     fig = go.Figure()
+    color_map = {
+        grp: ("#FF0000" if grp == "Глобальный" else group_configs[grp]["vis"]["color"])
+        for grp in selected_groups
+    }
 
     for group in selected_groups:
         # выбираем ID домов для группы
@@ -415,7 +419,8 @@ def build_floor_elasticity_chart(selected_groups, global_filtered_data, group_co
         alpha_down = minimize(loss_down, x0=np.array([0.5])).x
 
         fig.add_trace(go.Scatter(
-            x=x, y=y, mode="lines+markers", name=group
+            x=x, y=y, mode="lines+markers", name=group,
+            line=dict(color=color_map[group])
         ))
 
     

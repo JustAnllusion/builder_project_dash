@@ -4,6 +4,7 @@ import streamlit as st
 from components.widgets import numeric_filter_widget, categorical_filter_widget
 from utils.utils import compute_smart_group_name, get_top_categories, apply_filters
 from utils.translations import rus_columns
+from pandas.api import types as ptypes
 
 def render_sidebar(house_data: pd.DataFrame):
 
@@ -153,7 +154,19 @@ def render_sidebar(house_data: pd.DataFrame):
                     col_data = group["base_data"][col].dropna()
                     display_name = rus_columns.get(col, col)
                     st.markdown(f"**{display_name}**")
-                    if pd.api.types.is_numeric_dtype(house_data[col]):
+                    if ptypes.is_datetime64_any_dtype(house_data[col]):
+                        min_date = col_data.min().date()
+                        max_date = col_data.max().date()
+                        start_date, end_date = st.date_input(
+                            "",  # no label, header above
+                            value=(min_date, max_date),
+                            key=f"group_filter_{idx}_{col}"
+                        )
+                        column_filters[col] = (
+                            pd.Timestamp(start_date),
+                            pd.Timestamp(end_date)
+                        )
+                    elif pd.api.types.is_numeric_dtype(house_data[col]):
                         column_filters[col] = numeric_filter_widget(
                             display_name, col_data, key_prefix=f"group_filter_{idx}_{col}"
                         )
