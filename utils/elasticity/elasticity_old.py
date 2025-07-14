@@ -12,311 +12,62 @@ from bokeh.plotting import ColumnDataSource, column, figure
 from bokeh.transform import factor_cmap
 from scipy.optimize import minimize
 from tqdm import tqdm
-
-from .utils import *
-from .variables import *
+import pandas as pd
+# from .utils import *
+# from .variables import *
+import numpy as np
 
 warnings.filterwarnings("ignore")
+DICT_ELASTICITY_ROOMS_NUMBER = {
+    30: [(0, 1)],
+    35: [(1, 2)],
+    40: [(1, 2)],
+    45: [(1, 2)],
+    50: [(1, 2), (2, 3)],
+    55: [(1, 2), (2, 3)],
+    60: [(2, 3)],
+    65: [(2, 3)],
+    70: [(2, 3)],
+    75: [(2, 3), (3, 4)],
+    80: [(2, 3), (3, 4)],
+    85: [(2, 3), (3, 4)],
+    90: [(2, 3), (3, 4)],
+    95: [(2, 3), (3, 4)]
+}
+
+DICT_ELASTICITY_ROOMS_NUMBER_WITHOUT_SEGMENTS = {
+    30: [(0,1), (1,2), (2,3), (3,4), (4,5)]
+}
 
 
-def get_atomic_area_elasticity(
-    deals: pd.DataFrame,
-    number_of_projects: int = 10,
-    number_of_house: int = 5,
-    discounting_mode: str = "trend",
-    min_year: int = 2020,
-    max_year: int = 2024,
-) -> column:
-    """
-    Функция возвращает рисунок атомарных эластичностей по площади, то есть кривых эластичности по каждому из жилых
-    корпусов
-    :param deals: сделки
-    :param number_of_projects: топ-сколько проектов показываем
-    :param number_of_house: топ-сколько домов внутри проектов показываем
-    :param discounting_mode: параметр дисконтирования
-    :param min_year: с какого года считаем сделки
-    :param max_year: дло какого года считаем сделки
-    :return: column из bokeh-рисунков
-    """
-    data = deals.copy()
-
-    if discounting_mode == "actual":
-        interest_rate = get_interest_rate(data, is_ml=False)
-        data["price"] = discounting(data, interest_rate)
-
-    if discounting_mode == "retro":
-        interest_rate = get_interest_rate(data, is_ml=True)
-        data["price"] = discounting(data, interest_rate)
-
-    data = data[
-        (data["contract_date"].dt.year >= min_year)
-        & (data["contract_date"].dt.year <= max_year)
-    ]
-    list_of_projects = list(
-        data["project"].value_counts().iloc[:number_of_projects:].index
-    )
-    data["area"] = data["area"].round(0)
-
-    result = []
-    for prj in tqdm(list_of_projects):
-        deals_proj = data[data["project"] == prj]
-        list_of_house = list(
-            deals_proj["house_id"].value_counts().iloc[:number_of_house:].index
-        )
-
-        for house in list_of_house:
-            deals_house = deals_proj[deals_proj["house_id"] == house]
-            floor_set = sorted(list(set(deals_house["floor"])))
-            deals_house["floor"] = deals_house["floor"].astype(str)
-
-            index_cmap = factor_cmap(
-                "floor",
-                palette=magma(len(set(floor_set))),
-                factors=sorted(deals_house.floor.unique()),
-            )
-
-            p = figure(
-                width=1300,
-                height=600,
-                title=(
-                    prj
-                    + ", дом "
-                    + str(house)
-                    + f", {len(deals_house)} сделок, дисконтирование={discounting_mode}"
-                ),
-            )
-
-            for i in range(len(floor_set)):
-                df = deals_house.loc[(deals_house.floor == f"{floor_set[i]}")]
-                df["area"] = df["area"] + st.uniform.rvs(-0.25, 0.5, size=len(df))
-                p.scatter(
-                    "area",
-                    "price",
-                    source=df,
-                    fill_alpha=0.6,
-                    fill_color=index_cmap,
-                    size=10,
-                    legend_group="floor",
-                )
-
-            x_all_mean = deals_house.groupby(by="area").mean().index
-            y_all_mean = deals_house.groupby(by="area").mean()["price"]
-
-            p.line(
-                x_all_mean,
-                y_all_mean,
-                line_width=2,
-                line_color="red",
-                legend_label="Зависимость в среднем",
-            )
-            p.add_layout(p.legend[0], "right")
-            p.legend.click_policy = "hide"
-            p.legend.label_text_font_size = "12px"
-            p.legend.ncols = 2
-
-            res = [p]
-            titles = ["Все квартиры"]
-
-            for room_number in sorted(list(set(deals_house["rooms_number"]))):
-                deals_house_room = deals_house[
-                    deals_house["rooms_number"] == room_number
-                ]
-                floor_set = sorted(list(set(deals_house_room["floor"])))
-
-                index_cmap = factor_cmap(
-                    "floor",
-                    palette=magma(len(set(floor_set))),
-                    factors=sorted(deals_house_room.floor.unique()),
-                )
-
-                p = figure(
-                    width=1300,
-                    height=600,
-                    title=(
-                        prj
-                        + ", дом "
-                        + str(house)
-                        + f", {len(deals_house_room)} сделок, дисконтирование={discounting_mode}"
-                    ),
-                )
-
-                for i in range(len(floor_set)):
-                    df = deals_house_room.loc[
-                        (deals_house_room.floor == f"{floor_set[i]}")
-                    ]
-                    if len(df) > 0:
-                        df["area"] = df["area"] + st.uniform.rvs(
-                            -0.25, 0.5, size=len(df)
-                        )
-                        p.scatter(
-                            "area",
-                            "price",
-                            source=df,
-                            fill_alpha=0.6,
-                            fill_color=index_cmap,
-                            size=10,
-                            legend_group="floor",
-                        )
-
-                x_temp_mean = deals_house_room.groupby(by="area").mean().index
-                y_temp_mean = deals_house_room.groupby(by="area").mean()["price"]
-
-                p.line(
-                    x_temp_mean,
-                    y_temp_mean,
-                    line_width=2,
-                    line_color="red",
-                    legend_label="Зависимость в среднем",
-                )
-                p.add_layout(p.legend[0], "right")
-                p.legend.click_policy = "hide"
-                p.legend.label_text_font_size = "12px"
-                p.legend.ncols = 2
-                p.legend.nrows = 15
-
-                res.append(p)
-                titles.append(f"{room_number} комнат")
-
-            result.append(
-                Tabs(
-                    tabs=[
-                        TabPanel(child=res[i], title=titles[i]) for i in range(len(res))
-                    ]
-                )
-            )
-    return column(result)
+FLOOR_ELASTICITY = [
+    (1, 2),
+    (2, 3),
+    (3, 4),
+    (4, 5),
+    (5, 6),
+    (6, 7),
+    (7, 8),
+    (8, 9),
+    (9, 10),
+    (10, 11),
+    (11, 12),
+    (12, 13),
+    (13, 14),
+    (14, 15),
+    (15, 16),
+    (16, 17),
+    (17, 18),
+    (18, 19),
+    (19, 20),
+    (20, 21),
+    (21, 22),
+    (22, 23),
+    (23, 24),
+    (24, 25)
+]
 
 
-def get_area_elasticity_by_house(
-    deals: pd.DataFrame,
-    area_min: tp.Optional[float] = None,
-    area_max: tp.Optional[float] = None,
-    discretization: bool = True,
-    developers: tp.Optional[list[list[int]]] = None,
-    show_all: bool = False,
-    discounting_mode: tp.Optional[str] = None,
-    rooms_number: tp.Optional[list[int]] = None,
-    names: list[str] = None,
-) -> tp.Any:
-    df = deals.copy()
-
-    if names is None:
-        names = [""]
-
-    names_temp = cycle(names)
-    palette = cycle(px.colors.qualitative.Plotly)
-
-    if discounting_mode is None:
-        discounting_mode = "trend"
-
-    if discounting_mode == "retro":
-        interest_rate = get_interest_rate(df, is_ml=True)
-        df["price"] = discounting(df, interest_rate)
-
-    if discounting_mode == "actual":
-        interest_rate = get_interest_rate(df, is_ml=False)
-        df["price"] = discounting(df, interest_rate)
-
-    if discretization:
-        if "area" not in df.columns:
-            raise KeyError("Столбец 'area' отсутствует в данных.")
-        df["area"] = df["area"].round(0)
-
-    if developers is None:
-        developers = [sorted(list(set(df["developer"])))]
-    elif show_all:
-        developers.insert(0, sorted(list(set(df["developer"]))))
-
-    if area_min is None:
-        area_min = df["area"].min()
-    if area_max is None:
-        area_max = df["area"].max()
-
-    if pd.isna(area_min) or pd.isna(area_max):
-        raise ValueError(
-            "Невозможно вычислить границы 'area'. Возможно, столбец 'area' пуст или содержит неверные данные."
-        )
-
-    if rooms_number is None:
-        rooms_number = sorted(list(set(df["rooms_number"])))
-
-    df = df[(df["area"] >= area_min) & (df["area"] <= area_max)]
-    df = df[df["rooms_number"].isin(rooms_number)]
-
-    fig = go.Figure()
-    fig.update_layout(
-        title=dict(
-            text=f"Эластичность площади по корпусам, комнаты: {rooms_number},"
-            f" дисконтирование: {discounting_mode}"
-        ),
-        font=dict(size=10),
-    )
-
-    table = pd.DataFrame(columns=["area"])
-    try:
-        table["area"] = np.arange(area_min, area_max + 5, 5)
-    except Exception as e:
-        raise ValueError(f"Ошибка при формировании диапазона площадей: {e}")
-
-    for dev in developers:
-        current_name = next(names_temp)
-        current_color = next(palette)
-        df_developers = df[df["developer"].isin(dev)]
-        df_developers_grouped = df_developers.groupby(by="house_id")
-
-        df_res = pd.DataFrame()
-
-        for group in tqdm(
-            df_developers_grouped.groups, desc=f"Обработка девелопера {current_name}"
-        ):
-            df_temp_grouped = df_developers_grouped.get_group(group)
-            temp_res = df_temp_grouped[["area", "price"]].groupby(by="area").mean()
-            temp_res.rename(columns={"price": f"price {group}"}, inplace=True)
-            df_res = pd.concat([df_res, temp_res], axis=1)
-
-        df_res.sort_index(inplace=True)
-        for col in df_res.columns:
-            ind = df_res[col].first_valid_index()
-            if ind is not None and df_res[col][ind] != 0:
-                df_res[col] = df_res[col] / df_res[col][ind]
-        result = df_res.mean(axis=1)
-
-        def g(deg, emp_elasticity):
-            return sum(
-                (
-                    (emp_elasticity.index[0] ** deg) / (emp_elasticity.index[i] ** deg)
-                    - emp_elasticity.iloc[i]
-                )
-                ** 2
-                for i in range(len(emp_elasticity))
-            )
-
-        def temp_func(x):
-            return g(x, result)
-
-        alpha = minimize(temp_func, x0=np.array([1])).x
-
-        fig.add_trace(
-            go.Scatter(
-                x=result.index,
-                y=result.values,
-                name=f"Кривая эластичности, {current_name}",
-                mode="lines+markers",
-                line=dict(color=current_color),
-            )
-        )
-        fig.add_trace(
-            go.Scatter(
-                x=result.index,
-                y=(result.index[0] ** alpha) / result.index**alpha,
-                name=f"Гиперболическая оценка {current_name}",
-                mode="lines+markers",
-                line=dict(color=current_color),
-            )
-        )
-
-        table[current_name] = (result.index[0] ** alpha) / (table["area"] ** alpha)
-    return fig
 
 
 def find_segment(x, area_min, area_max, split_parameter):
@@ -328,233 +79,6 @@ def find_segment(x, area_min, area_max, split_parameter):
         if segments[i] <= x < segments[i + 1]:
             return segments[i]
     return segments[-1]
-
-
-def get_segmented_area_elasticity_by_house(
-    deals: pd.DataFrame,
-    area_min: int = 30,
-    area_max: int = 100,
-    split_parameters: tp.Optional[list[int]] = None,
-    mode_split: tp.Optional[str] = None,
-    developers: tp.Optional[list[list[int]]] = None,
-    show_all: bool = False,
-    discounting_mode: tp.Optional[str] = None,
-    names: tp.Optional[list[str]] = None,
-) -> column:
-    """
-    Функция для анализа сегментированной эластичности цены по площади
-    :param deals: все сделки
-    :param area_min: минимальная площадь
-    :param area_max: максимальная площадь
-    :param split_parameters: параметр сегментации (на сколько кв.м. округляем площадь)
-    :param mode_split: какого типа графики строим, непрерывные или cadlag, пока заглушка
-    :param developers: для каких девелоперов отдельно строим эластичность.
-    :param show_all: показываем ли эластичность для всего рынка
-    :param discounting_mode: параметр дисконтирования
-    :param names: имена для легенд
-    :return: column с кривыми эластичности цены от сегментированной площади для разных параметров сегментирования.
-    Один рисунок состоит из кривых для всех квартир и кривых для квартир каждой комнатности.
-    """
-
-    df = deals.copy()
-
-    if names is None:
-        names = ["Рынок"]
-    names_temp = cycle(names)
-
-    if discounting_mode is None:
-        discounting_mode = "trend"
-
-    if discounting_mode == "retro":
-        interest_rate = get_interest_rate(df, is_ml=True)
-        df["price"] = discounting(df, interest_rate)
-    if discounting_mode == "actual":
-        interest_rate = get_interest_rate(df, is_ml=False)
-        df["price"] = discounting(df, interest_rate)
-
-    if developers is None:
-        developers = [sorted(list(set(df["developer"])))]
-    elif show_all:
-        developers.insert(0, sorted(list(set(df["developer"]))))
-
-    if area_min is None:
-        area_min = df["area"].min()
-    if area_max is None:
-        area_max = df["area"].max()
-
-    if split_parameters is None:
-        split_parameters = [1]
-
-    if mode_split is None:
-        mode_split = "cadlag"
-
-    df = df[(df["area"] >= area_min) & (df["area"] <= area_max)]
-
-    rooms_set = sorted(list(set(df["rooms_number"])))
-    rooms_numbers = [rooms_set] + [[rooms_set[i]] for i in range(len(rooms_set))]
-    titles = [
-        "Все сделки",
-        "Студии",
-        "1 комната",
-        "2 комнаты",
-        "3 комнаты",
-        "4 комнаты",
-        "5 комнат",
-    ]
-
-    result_layout = []
-
-    for split_parameter in tqdm(split_parameters):
-        df["area"] = df["area"].apply(
-            lambda x: find_segment(x, area_min, area_max, split_parameter)
-        )
-
-        res = []
-        for room_number in rooms_numbers:
-            df_room = df[df["rooms_number"].isin(room_number)]
-
-            tooltips_p = [
-                ("area", "$x"),
-                ("coefficient", "$y"),
-            ]
-
-            p = figure(
-                width=1300,
-                height=400,
-                tooltips=tooltips_p,
-                title=(
-                    "Эластичность площади по корпусам, "
-                    + f"дисконтирование: {discounting_mode}, "
-                    + f"параметр сегментирования: {split_parameter} кв.м."
-                ),
-            )
-
-            tooltips_q = [("area", "$x"), ("deals_number", "$y")]
-            q = figure(
-                width=1300,
-                height=200,
-                title="Количество сделок",
-                tooltips=tooltips_q,
-                x_range=p.x_range,
-            )
-
-            palette = cycle(px.colors.qualitative.Plotly)
-
-            for dev in developers:
-                current_name = next(names_temp)
-                current_color = next(palette)
-                df_developers = df_room[df_room["developer"].isin(dev)]
-                df_developers_grouped = df_developers.groupby(by="house_id")
-
-                df_res = pd.DataFrame()
-
-                for group in df_developers_grouped.groups:
-                    df_temp_grouped = df_developers_grouped.get_group(group)
-                    temp_res = (
-                        df_temp_grouped[["area", "price"]].groupby(by="area").mean()
-                    )
-                    temp_res.rename(columns={"price": f"price {group}"}, inplace=True)
-                    df_res = pd.concat([df_res, temp_res], axis=1)
-
-                df_res.sort_index(inplace=True)
-                for column_temp in df_res.columns:
-                    ind = df_res[column_temp].first_valid_index()
-                    df_res[column_temp] = df_res[column_temp] / df_res[column_temp][ind]
-                result = df_res.mean(axis=1)
-
-                def g(deg, emp_elasticity):
-                    l2_norm = sum(
-                        (
-                            (emp_elasticity.index[0] ** deg)
-                            / (emp_elasticity.index[i] ** deg)
-                            - emp_elasticity.iloc[i]
-                        )
-                        ** 2
-                        for i in range(len(emp_elasticity))
-                    )
-                    return l2_norm
-
-                def temp_func(x):
-                    return g(x, result)
-
-                alpha = minimize(temp_func, x0=np.array([1])).x
-
-                source_p = ColumnDataSource(
-                    data=dict(
-                        x=result.index,
-                        y=result.values,
-                    )
-                )
-
-                p.line(
-                    x="x",
-                    y="y",
-                    source=source_p,
-                    legend_label=f"Кривая эластичности, {current_name}",
-                    line_color=current_color,
-                    line_width=2,
-                )
-
-                p.circle(
-                    x="x",
-                    y="y",
-                    source=source_p,
-                    legend_label=f"Кривая эластичности, {current_name}",
-                    color=current_color,
-                )
-
-                p.line(
-                    x=result.index,
-                    y=(result.index[0] ** alpha) / result.index**alpha,
-                    legend_label=f"Гиперболическая оценка {current_name}",
-                    line_color=current_color,
-                    line_dash=[5, 10],
-                    line_width=2,
-                )
-
-                top = [
-                    len(df_developers[df_developers["area"] == ind])
-                    for ind in result.index
-                ]
-
-                source_q = ColumnDataSource(
-                    data=dict(
-                        x=result.index
-                        + np.array([split_parameter / 2] * len(result.index)),
-                        y=top,
-                    )
-                )
-
-                q.vbar(
-                    x="x",
-                    top="y",
-                    source=source_q,
-                    width=(split_parameter - 1) + 0.9,
-                    color=current_color,
-                    legend_label=f"Количество сделок, {current_name}",
-                )
-
-            p.add_layout(p.legend[0], "right")
-            q.add_layout(q.legend[0], "right")
-            p.legend.click_policy = "hide"
-            q.legend.click_policy = "hide"
-            res.append(column([p, q]))
-
-        result_layout.append(
-            Tabs(
-                tabs=[TabPanel(child=res[i], title=titles[i]) for i in range(len(res))]
-            )
-        )
-        result_layout.append(Div(text="<br><hr width=1300 height=10/><br>"))
-
-    text = (
-        "<h2> Коэффициенты эластичности по сегментированной площади"
-        + f" от {area_min} до {area_max} кв.м. </h2>"
-    )
-    tit = Div(text=text, width=1300)
-
-    return column([tit] + result_layout)
-
 
 def get_area_intersection_for_rooms_number(
     deals: pd.DataFrame,
@@ -790,12 +314,12 @@ def get_intersected_rooms_number_elasticity(
     if area_max is None:
         area_max = df["area"].max()
 
-    if discounting_mode == "retro":
-        interest_rate = get_interest_rate(df, is_ml=True)
-        df["price"] = discounting(df, interest_rate)
-    if discounting_mode == "actual":
-        interest_rate = get_interest_rate(df, is_ml=False)
-        df["price"] = discounting(df, interest_rate)
+    # if discounting_mode == "retro":
+    #     interest_rate = get_interest_rate(df, is_ml=True)
+    #     df["price"] = discounting(df, interest_rate)
+    # if discounting_mode == "actual":
+    #     interest_rate = get_interest_rate(df, is_ml=False)
+    #     df["price"] = discounting(df, interest_rate)
 
     df = df[(df["area"] >= area_min) & (df["area"] <= area_max)]
     df["area"] = df["area"].apply(
@@ -923,13 +447,13 @@ def get_floor_elasticity(deals: pd.DataFrame, discounting_mode: str = "trend"):
 
     df = deals.copy()
 
-    if discounting_mode == "retro":
-        interest_rate = get_interest_rate(df, is_ml=True)
-        df["price"] = discounting(deals, interest_rate)
-    if discounting_mode == "actual":
-        interest_rate = get_interest_rate(df, is_ml=False)
-        df["price"] = discounting(deals, interest_rate)
-
+    # if discounting_mode == "retro":
+    #     interest_rate = get_interest_rate(df, is_ml=True)
+    #     df["price"] = discounting(deals, interest_rate)
+    # if discounting_mode == "actual":
+    #     interest_rate = get_interest_rate(df, is_ml=False)
+    #     df["price"] = discounting(deals, interest_rate)
+    #
     dtest = [
         df.groupby(by=["house_id", "rooms_number"]).apply(
             lambda x: house_room_filter(x, FLOOR_ELASTICITY[i])
@@ -953,7 +477,7 @@ def get_floor_elasticity(deals: pd.DataFrame, discounting_mode: str = "trend"):
             .apply(tuple, axis=1)
             .isin(dict_house[FLOOR_ELASTICITY[i]])
         ]
-        temp_result = df_temp.groupby(by=["house_id", "rooms_number"]).apply(
+        temp_result = df_temp.groupby(by=["house_id", "rooms_number"], group_keys=False).apply(
             lambda x: floor_elasticity_hr(x, FLOOR_ELASTICITY[i])
         )
         temp_result = temp_result.reset_index()
@@ -985,14 +509,14 @@ def get_atomic_rn_elasticity(
     """
     data = deals.copy()
 
-    if discounting_mode == "actual":
-        interest_rate = get_interest_rate(data, is_ml=False)
-        data["price"] = discounting(data, interest_rate)
-
-    if discounting_mode == "retro":
-        interest_rate = get_interest_rate(data, is_ml=True)
-        data["price"] = discounting(data, interest_rate)
-
+    # if discounting_mode == "actual":
+    #     interest_rate = get_interest_rate(data, is_ml=False)
+    #     data["price"] = discounting(data, interest_rate)
+    #
+    # if discounting_mode == "retro":
+    #     interest_rate = get_interest_rate(data, is_ml=True)
+    #     data["price"] = discounting(data, interest_rate)
+    #
     data = data[
         (data["contract_date"].dt.year >= min_year)
         & (data["contract_date"].dt.year <= max_year)

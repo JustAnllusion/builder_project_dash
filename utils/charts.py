@@ -374,7 +374,6 @@ def build_floor_elasticity_chart(selected_groups, global_filtered_data, group_co
         if df_group.empty:
             continue
 
-        # усредненная эластичность для каждой пары этажей
         df_mean = (
             df_group
             .groupby("from_floor", as_index=False)["elasticity"]
@@ -430,7 +429,7 @@ def build_floor_elasticity_chart(selected_groups, global_filtered_data, group_co
         height=400,
         title="Кривая эластичности по этажам",
         xaxis_title="Этаж",
-        yaxis_title="Накопленный коэффициент эластичности",
+        yaxis_title="Нормированная цена",
         showlegend=True
     )
 
